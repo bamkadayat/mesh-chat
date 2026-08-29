@@ -1,3 +1,5 @@
+import type { ChatEvent } from '../protocol/protocol';
+
 /** How the connection to the signaling server is doing. */
 export type SessionStatus =
   | 'idle'
@@ -43,3 +45,8 @@ export type TimelineItem =
 export type ChatState = {
   timeline: TimelineItem[];
 };
+
+/** Chat events come from peers and from ourselves. System events are local only. */
+export type ChatAction =
+  | { kind: 'chat-event'; event: ChatEvent }
+  | { kind: 'system-event'; event: SystemEvent };
