@@ -12,7 +12,7 @@ const sharedRules = {
 export default tseslint.config(
   { ignores: ['dist/**', 'node_modules/**'] },
 
-  // Browser application, type-aware through the frontend project.
+  /** Browser application, type-aware through the frontend project. */
   {
     files: ['frontend/src/**/*.{ts,tsx}'],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
@@ -34,7 +34,7 @@ export default tseslint.config(
     },
   },
 
-  // Signaling server, type-aware through the server project.
+  /** Signaling server, type-aware through the server project. */
   {
     files: ['server/src/**/*.ts'],
     extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
@@ -48,8 +48,7 @@ export default tseslint.config(
     rules: sharedRules,
   },
 
-  // Tooling configs belong to neither TypeScript project, so they are linted without
-  // type information.
+  /** Tooling configs are in neither project, so they are linted without types. */
   {
     files: ['eslint.config.js', 'frontend/vite.config.ts', 'frontend/vitest.config.ts', 'server/vitest.config.ts'],
     extends: [js.configs.recommended, tseslint.configs.recommended],

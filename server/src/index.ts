@@ -10,9 +10,7 @@ if (!Number.isInteger(port) || port <= 0) {
   throw new Error(`PORT must be a positive integer, received "${process.env.PORT ?? ''}"`);
 }
 
-// The signaling server exposes no HTTP surface of its own. Socket.IO attaches to this
-// server in a later step; until then every request answers 404 so a misconfigured
-// client fails loudly instead of hanging.
+/** No HTTP surface of its own. Socket.IO attaches here later. */
 const server = createServer((_request, response) => {
   response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
   response.end('Not found');

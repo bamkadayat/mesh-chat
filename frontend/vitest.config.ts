@@ -2,8 +2,7 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 
-// Frontend tests need a DOM. The server suite has its own config and must stay on the
-// node environment, so the two are never merged into one root configuration.
+/** Frontend tests need a DOM. The server suite has its own node config. */
 export default defineConfig({
   plugins: [react()],
   test: {
