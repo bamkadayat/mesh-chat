@@ -7,6 +7,7 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 const sharedRules = {
   '@typescript-eslint/no-explicit-any': 'error',
   '@typescript-eslint/consistent-type-imports': 'error',
+  '@typescript-eslint/no-deprecated': 'error',
 };
 
 export default tseslint.config(
