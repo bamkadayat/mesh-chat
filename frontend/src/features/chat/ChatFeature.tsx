@@ -10,11 +10,14 @@ const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL ?? 'http://localhost:30
  * The wording lives here, not in the transport. A participant sees this text and
  * never a raw socket error such as xhr poll error.
  */
-const ERROR_TEXT: Record<SessionErrorReason, string> = {
-  'server-unreachable':
-    'Cannot reach the chat server. Check that it is running, then try again.',
-  'join-rejected': 'The session could not be joined with that name. Try another one.',
-};
+function errorText(reason: SessionErrorReason): string {
+  switch (reason) {
+    case 'server-unreachable':
+      return 'Cannot reach the chat server. Check that it is running, then try again.';
+    case 'join-rejected':
+      return 'The session could not be joined with that name. Try another one.';
+  }
+}
 
 export function ChatFeature() {
   const session = useChatSession(SIGNALING_URL);
@@ -27,7 +30,7 @@ export function ChatFeature() {
           void session.join(displayName);
         }}
         isJoining={session.status === 'connecting'}
-        connectionError={session.errorReason === null ? null : ERROR_TEXT[session.errorReason]}
+        connectionError={session.errorReason === null ? null : errorText(session.errorReason)}
       />
     );
   }
