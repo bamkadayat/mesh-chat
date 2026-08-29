@@ -34,6 +34,19 @@ export default tseslint.config(
     },
   },
 
+  /** Shared contracts, type-checked with the server project so DOM types fail here. */
+  {
+    files: ['shared/**/*.ts'],
+    extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
+    languageOptions: {
+      parserOptions: {
+        project: ['./server/tsconfig.json'],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: sharedRules,
+  },
+
   /** Signaling server, type-aware through the server project. */
   {
     files: ['server/src/**/*.ts'],
