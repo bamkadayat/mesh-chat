@@ -1,5 +1,6 @@
 import { useState, type SubmitEvent } from 'react';
 import { JoinScreen } from './components/JoinScreen/JoinScreen';
+import { MAX_MESSAGE_LENGTH } from './model/constants';
 import { useChatSession } from './hooks/useChatSession';
 import type { SessionErrorReason } from './model/types';
 
@@ -32,11 +33,19 @@ export function ChatFeature() {
   }
 
   /** Temporary session view. The mockup panel replaces it in the next step. */
+  /**
+   * Readiness is re-checked here, not just on the button. It can change between
+   * render and submit, and the field is cleared only once the send is accepted.
+   */
   function handleSend(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
+
     const text = draft.trim();
-    if (text !== '') {
-      session.sendMessage(text);
+    if (text === '' || session.readiness !== 'open') {
+      return;
+    }
+
+    if (session.sendMessage(text)) {
       setDraft('');
     }
   }
@@ -75,6 +84,7 @@ export function ChatFeature() {
         <label htmlFor="draft">Message</label>{' '}
         <input
           id="draft"
+          maxLength={MAX_MESSAGE_LENGTH}
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value);

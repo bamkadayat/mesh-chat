@@ -34,9 +34,10 @@ export type ChatSession = {
   localParticipantId: string;
   join: (displayName: string) => Promise<void>;
   leave: () => void;
-  sendMessage: (text: string) => void;
-  editMessage: (messageId: string, text: string) => void;
-  deleteMessage: (messageId: string) => void;
+  /** Returns false when the protocol rejects the event, so the caller keeps the input. */
+  sendMessage: (text: string) => boolean;
+  editMessage: (messageId: string, text: string) => boolean;
+  deleteMessage: (messageId: string) => boolean;
 };
 
 type ActiveSession = {
@@ -213,26 +214,27 @@ export function useChatSession(signalingUrl: string): ChatSession {
    * Sending and receiving take the same path: serialize, parse, dispatch. Local
    * state can then only hold what a peer would also accept.
    */
-  const applyAndBroadcast = useCallback((event: ChatEvent): void => {
+  const applyAndBroadcast = useCallback((event: ChatEvent): boolean => {
     const session = sessionRef.current;
     const accepted = parseChatEvent(serializeChatEvent(event));
 
     if (session === null || accepted === null) {
-      return;
+      return false;
     }
 
     dispatch({ kind: 'chat-event', event: accepted });
     session.mesh.broadcast(serializeChatEvent(accepted));
+    return true;
   }, []);
 
   const sendMessage = useCallback(
-    (text: string): void => {
+    (text: string): boolean => {
       const identity = sessionRef.current?.identity;
       if (identity === undefined) {
-        return;
+        return false;
       }
 
-      applyAndBroadcast({
+      return applyAndBroadcast({
         type: 'message:create',
         payload: {
           messageId: createId(),
@@ -247,13 +249,13 @@ export function useChatSession(signalingUrl: string): ChatSession {
   );
 
   const editMessage = useCallback(
-    (messageId: string, text: string): void => {
+    (messageId: string, text: string): boolean => {
       const identity = sessionRef.current?.identity;
       if (identity === undefined) {
-        return;
+        return false;
       }
 
-      applyAndBroadcast({
+      return applyAndBroadcast({
         type: 'message:update',
         payload: {
           messageId,
@@ -267,13 +269,13 @@ export function useChatSession(signalingUrl: string): ChatSession {
   );
 
   const deleteMessage = useCallback(
-    (messageId: string): void => {
+    (messageId: string): boolean => {
       const identity = sessionRef.current?.identity;
       if (identity === undefined) {
-        return;
+        return false;
       }
 
-      applyAndBroadcast({
+      return applyAndBroadcast({
         type: 'message:delete',
         payload: {
           messageId,
