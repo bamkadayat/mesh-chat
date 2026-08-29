@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Mesh Chat">
+  <rect width="32" height="32" rx="7" fill="#1a73e8" />
+  <g stroke="#ffffff" stroke-width="1.6" stroke-linecap="round">
+    <path d="M16 9 L23 20 M16 9 L9 20 M9 20 L23 20" />
+  </g>
+  <g fill="#ffffff">
+    <circle cx="16" cy="9" r="3" />
+    <circle cx="9" cy="20" r="3" />
+    <circle cx="23" cy="20" r="3" />
+  </g>
+</svg>
