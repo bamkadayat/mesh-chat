@@ -9,6 +9,12 @@ export type SessionStatus =
   | 'error';
 
 /**
+ * Why a session could not start or keep running. A reason, not a message: the
+ * component that shows it owns the wording, so raw transport text never leaks out.
+ */
+export type SessionErrorReason = 'server-unreachable' | 'join-rejected';
+
+/**
  * Whether a message can reach every peer right now.
  * Separate from SessionStatus: being in the room does not mean the channel is open.
  */

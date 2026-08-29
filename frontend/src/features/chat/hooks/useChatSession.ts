@@ -8,6 +8,7 @@ import { loadParticipantId } from '../model/identity';
 import { chatReducer, initialChatState } from '../model/reducer';
 import type {
   ComposerReadiness,
+  SessionErrorReason,
   SessionStatus,
   SystemEvent,
   TimelineItem,
@@ -26,6 +27,7 @@ import {
 
 export type ChatSession = {
   status: SessionStatus;
+  errorReason: SessionErrorReason | null;
   participants: Participant[];
   timeline: TimelineItem[];
   readiness: ComposerReadiness;
@@ -46,6 +48,7 @@ type ActiveSession = {
 
 export function useChatSession(signalingUrl: string): ChatSession {
   const [status, setStatus] = useState<SessionStatus>('idle');
+  const [errorReason, setErrorReason] = useState<SessionErrorReason | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [channelStates, setChannelStates] = useState<Record<string, ChannelState>>({});
   const [chat, dispatch] = useReducer(chatReducer, initialChatState);
@@ -78,6 +81,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
   const join = useCallback(
     async (displayName: string): Promise<void> => {
       closeSession();
+      setErrorReason(null);
       setStatus('connecting');
 
       const identity: Participant = {
@@ -164,6 +168,9 @@ export function useChatSession(signalingUrl: string): ChatSession {
           mesh.removePeer(participantId);
         }),
         signaling.onConnectionChange((state) => {
+          if (state === 'failed') {
+            setErrorReason('server-unreachable');
+          }
           setStatus(toSessionStatus(state));
         }),
       ];
@@ -178,6 +185,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
 
       if (!outcome.ok) {
         closeSession();
+        setErrorReason(outcome.reason === 'no-response' ? 'server-unreachable' : 'join-rejected');
         setStatus('error');
         return;
       }
@@ -196,6 +204,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
   const leave = useCallback((): void => {
     closeSession();
     setStatus('idle');
+    setErrorReason(null);
     setParticipants([]);
     setChannelStates({});
   }, [closeSession]);
@@ -283,6 +292,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
 
   return {
     status,
+    errorReason,
     participants,
     timeline: chat.timeline,
     readiness,

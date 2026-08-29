@@ -1,70 +1,70 @@
 import { useState, type SubmitEvent } from 'react';
+import { JoinScreen } from './components/JoinScreen/JoinScreen';
 import { useChatSession } from './hooks/useChatSession';
+import type { SessionErrorReason } from './model/types';
 
 const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL ?? 'http://localhost:3001';
 
 /**
- * Temporary slice for step 11. It exists to prove a message travels browser to
- * browser over a data channel. The real screens replace it in steps 12 and 13.
+ * The wording lives here, not in the transport. A participant sees this text and
+ * never a raw socket error such as xhr poll error.
  */
+const ERROR_TEXT: Record<SessionErrorReason, string> = {
+  'server-unreachable':
+    'Cannot reach the chat server. Check that it is running, then try again.',
+  'join-rejected': 'The session could not be joined with that name. Try another one.',
+};
+
 export function ChatFeature() {
   const session = useChatSession(SIGNALING_URL);
-  const [name, setName] = useState('');
   const [draft, setDraft] = useState('');
 
-  function handleJoin(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
-    const trimmed = name.trim();
-    if (trimmed !== '') {
-      void session.join(trimmed);
-    }
+  if (session.status === 'idle' || session.status === 'connecting' || session.status === 'error') {
+    return (
+      <JoinScreen
+        onJoin={(displayName) => {
+          void session.join(displayName);
+        }}
+        isJoining={session.status === 'connecting'}
+        connectionError={session.errorReason === null ? null : ERROR_TEXT[session.errorReason]}
+      />
+    );
   }
 
+  /** Temporary session view. The mockup panel replaces it in the next step. */
   function handleSend(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
-    const trimmed = draft.trim();
-    if (trimmed !== '') {
-      session.sendMessage(trimmed);
+    const text = draft.trim();
+    if (text !== '') {
+      session.sendMessage(text);
       setDraft('');
     }
   }
 
-  if (session.status === 'idle') {
-    return (
-      <form onSubmit={handleJoin}>
-        <label htmlFor="name">Display name</label>{' '}
-        <input id="name" value={name} onChange={(e) => setName(e.target.value)} />{' '}
-        <button type="submit">Join</button>
-      </form>
-    );
-  }
-
   return (
     <section>
-      <p>
-        status <b data-testid="status">{session.status}</b>
-        {' · '}readiness <b data-testid="readiness">{session.readiness}</b>
-        {' · '}
+      <p role="status">
+        {session.status === 'reconnecting'
+          ? 'Reconnecting to the chat server…'
+          : `Connected · ${session.readiness}`}{' '}
         <button type="button" onClick={session.leave}>
           Leave
         </button>
       </p>
 
-      <p data-testid="participants">
+      <p>
         participants ({session.participants.length}):{' '}
-        {session.participants
-          .map((p) => `${p.displayName} [${p.participantId.slice(0, 8)}]`)
-          .join(', ')}
+        {session.participants.map((participant) => participant.displayName).join(', ')}
       </p>
 
-      <ul data-testid="timeline">
+      <ul>
         {session.timeline.map((item) =>
           item.kind === 'message' ? (
-            <li key={item.message.messageId} data-testid="message">
+            <li key={item.message.messageId}>
               <b>{item.message.authorName}</b>: {item.message.text}
             </li>
           ) : (
-            <li key={item.event.eventId} data-testid="system">
+            <li key={item.event.eventId}>
               {item.event.displayName} {item.event.type}
             </li>
           ),
@@ -73,7 +73,13 @@ export function ChatFeature() {
 
       <form onSubmit={handleSend}>
         <label htmlFor="draft">Message</label>{' '}
-        <input id="draft" value={draft} onChange={(e) => setDraft(e.target.value)} />{' '}
+        <input
+          id="draft"
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+          }}
+        />{' '}
         <button type="submit" disabled={session.readiness !== 'open'}>
           Send
         </button>

@@ -49,6 +49,7 @@ export function createSignalingClient(url: string): SignalingClient {
 
   let lastRequest: RoomJoinRequest | null = null;
   let hasJoinedOnce = false;
+  let hasConnectedOnce = false;
   const connectionHandlers = new Set<(state: ConnectionState) => void>();
   const rejoinHandlers = new Set<(outcome: JoinOutcome) => void>();
 
@@ -72,6 +73,7 @@ export function createSignalingClient(url: string): SignalingClient {
 
   /** Socket.IO reconnects on its own; the room has to be rejoined by hand. */
   socket.on('connect', () => {
+    hasConnectedOnce = true;
     announce('connected');
     if (hasJoinedOnce && lastRequest !== null) {
       const request = lastRequest;
@@ -87,8 +89,13 @@ export function createSignalingClient(url: string): SignalingClient {
     announce(socket.active ? 'reconnecting' : 'failed');
   });
 
+  /**
+   * Socket.IO keeps retrying, so socket.active alone would report reconnecting
+   * even on the very first attempt. Never having connected is a failure to reach
+   * the server, not a lost connection.
+   */
   socket.on('connect_error', () => {
-    announce(socket.active ? 'reconnecting' : 'failed');
+    announce(hasConnectedOnce && socket.active ? 'reconnecting' : 'failed');
   });
 
   return {
