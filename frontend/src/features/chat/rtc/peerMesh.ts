@@ -65,7 +65,7 @@ export function createPeerMesh(callbacks: PeerMeshCallbacks): PeerMesh {
     peers.set(peerId, peer);
 
     connection.onicecandidate = ({ candidate }) => {
-      if (candidate !== null) {
+      if (candidate !== null && isCurrentPeer(peerId, peer)) {
         callbacks.onLocalIceCandidate(peerId, {
           candidate: candidate.candidate,
           sdpMid: candidate.sdpMid,
@@ -157,6 +157,10 @@ export function createPeerMesh(callbacks: PeerMeshCallbacks): PeerMesh {
         }
         const offer = await peer.connection.createOffer();
         await peer.connection.setLocalDescription(offer);
+
+        if (!isCurrentPeer(peerId, peer)) {
+          return;
+        }
         callbacks.onLocalDescription(peerId, { type: 'offer', sdp: offer.sdp });
       } catch (error) {
         reportFailure(peerId, peer, error);
@@ -175,6 +179,10 @@ export function createPeerMesh(callbacks: PeerMeshCallbacks): PeerMesh {
 
         const answer = await peer.connection.createAnswer();
         await peer.connection.setLocalDescription(answer);
+
+        if (!isCurrentPeer(peerId, peer)) {
+          return;
+        }
         callbacks.onLocalDescription(peerId, { type: 'answer', sdp: answer.sdp });
       } catch (error) {
         reportFailure(peerId, peer, error);
