@@ -6,6 +6,7 @@ export type RoomManager = {
   listParticipants(roomId: string): Participant[];
   addParticipant(roomId: string, member: Member): void;
   removeBySocketId(socketId: string): { roomId: string; participantId: string } | null;
+  findParticipantId(socketId: string): string | null;
   findTargetSocketId(senderSocketId: string, targetParticipantId: string): string | null;
   roomCount(): number;
 };
@@ -62,6 +63,11 @@ export function createRoomManager(): RoomManager {
     return location;
   }
 
+  /** The server's own record of who a socket is, used to catch a forged sender. */
+  function findParticipantId(socketId: string): string | null {
+    return locations.get(socketId)?.participantId ?? null;
+  }
+
   /** Returns null when the target is in another room, so signals cannot cross rooms. */
   function findTargetSocketId(
     senderSocketId: string,
@@ -78,6 +84,7 @@ export function createRoomManager(): RoomManager {
     listParticipants,
     addParticipant,
     removeBySocketId,
+    findParticipantId,
     findTargetSocketId,
     roomCount: () => rooms.size,
   };

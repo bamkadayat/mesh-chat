@@ -38,7 +38,7 @@ export function registerSignalingHandlers(io: SignalingServer, rooms: RoomManage
     });
 
     socket.on('webrtc:ice-candidate', (signal) => {
-      if (!isIceCandidateSignal(signal)) {
+      if (!isIceCandidateSignal(signal) || !isGenuineSender(rooms, socket.id, signal)) {
         return;
       }
       const target = rooms.findTargetSocketId(socket.id, signal.toParticipantId);
@@ -64,11 +64,23 @@ function relayDescription(
   senderSocketId: string,
   signal: DescriptionSignal,
 ): void {
-  if (!isDescriptionSignal(signal)) {
+  if (!isDescriptionSignal(signal) || !isGenuineSender(rooms, senderSocketId, signal)) {
     return;
   }
   const target = rooms.findTargetSocketId(senderSocketId, signal.toParticipantId);
   if (target !== null) {
     io.to(target).emit(event, signal);
   }
+}
+
+/**
+ * TypeScript checks nothing at runtime, so fromParticipantId is only a claim.
+ * The server knows which participant owns this socket and drops anything else.
+ */
+function isGenuineSender(
+  rooms: RoomManager,
+  socketId: string,
+  signal: { fromParticipantId: string },
+): boolean {
+  return rooms.findParticipantId(socketId) === signal.fromParticipantId;
 }

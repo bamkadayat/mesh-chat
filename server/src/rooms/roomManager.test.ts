@@ -85,6 +85,33 @@ describe('roomManager removal', () => {
   });
 });
 
+describe('roomManager sender identity', () => {
+  it('reports which participant owns a socket', () => {
+    rooms.addParticipant(ROOM, { participantId: 'p1', displayName: 'Alex', socketId: 's1' });
+
+    expect(rooms.findParticipantId('s1')).toBe('p1');
+  });
+
+  it('returns null for an unknown socket', () => {
+    expect(rooms.findParticipantId('never-connected')).toBeNull();
+  });
+
+  it('follows the participant to a new socket after a rejoin', () => {
+    rooms.addParticipant(ROOM, { participantId: 'p1', displayName: 'Alex', socketId: 's1' });
+    rooms.addParticipant(ROOM, { participantId: 'p1', displayName: 'Alex', socketId: 's2' });
+
+    expect(rooms.findParticipantId('s2')).toBe('p1');
+    expect(rooms.findParticipantId('s1')).toBeNull();
+  });
+
+  it('forgets the socket once the participant leaves', () => {
+    rooms.addParticipant(ROOM, { participantId: 'p1', displayName: 'Alex', socketId: 's1' });
+    rooms.removeBySocketId('s1');
+
+    expect(rooms.findParticipantId('s1')).toBeNull();
+  });
+});
+
 describe('roomManager signal routing', () => {
   beforeEach(() => {
     rooms.addParticipant(ROOM, { participantId: 'p1', displayName: 'Alex', socketId: 's1' });
