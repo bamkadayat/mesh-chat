@@ -1,31 +1,48 @@
 # Mesh Chat
 
-Real-time group chat for small sessions. Chat messages travel **directly between
-browsers** over WebRTC DataChannels. A small Socket.IO server handles only signaling
-and presence, and never sees message content.
+Real-time peer-to-peer chat for small groups. Messages travel directly between
+browsers over WebRTC DataChannels. A small Socket.IO server handles signaling
+and presence only.
 
-## Getting started
+## Getting Started
 
-Requires Node.js 22+, pnpm 9+, and a browser with WebRTC support.
+Requires Node.js 22+, pnpm 9+, and a modern browser with WebRTC support.
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-The client runs on <http://localhost:5173> and the signaling server on port 3001.
-Open two or three windows to see the mesh form.
+The client runs at <http://localhost:5173>. The signaling server runs on port
+3001. Open the app in two or more browser windows to join the same room and
+send messages between participants.
+
+Useful checks:
 
 ```bash
-pnpm build   # tsc -b for both projects, then the Vite client build
+pnpm build
 pnpm lint
-pnpm check   # lint + unit tests + build
+pnpm check
 ```
 
-### Configuration
+## Tests
 
-The application runs with no `.env` at all. Copy `.env.example` to `.env` to change
-the defaults:
+The project has unit tests for the frontend, server, chat protocol, and chat
+state reducer. It also has a Playwright end-to-end test that opens two real
+browser participants and checks the full chat flow: join, connect, send, edit,
+delete, and leave.
+
+```bash
+pnpm test
+pnpm test:frontend
+pnpm test:server
+pnpm test:e2e
+```
+
+## Configuration
+
+The app works without a `.env` file. Copy `.env.example` to `.env` only if you
+want to change the defaults:
 
 ```dotenv
 VITE_SIGNALING_URL=http://localhost:3001
@@ -33,85 +50,53 @@ CLIENT_ORIGIN=http://localhost:5173
 PORT=3001
 ```
 
-`VITE_`-prefixed variables are inlined into the client bundle and are **not** secrets.
+`VITE_` variables are included in the client bundle, so they should not contain
+secrets.
 
-## Architecture
+## Architecture: Option B, Peer-to-Peer
 
-Peer-to-peer. Each browser holds a direct `RTCPeerConnection` to every other
-participant, and chat events travel over an `RTCDataChannel` on each of those
-connections. The server exists only to introduce peers to each other.
+This project uses Option B: peer-to-peer chat with WebRTC DataChannels.
 
-A server-relayed WebSocket design would also have been valid and simpler to reason
-about. Peer-to-peer was chosen because it demonstrates real direct communication and
-keeps the server deliberately small — at the cost of the mesh scaling limit described
-below.
+The browser sends chat messages directly to the other browsers in the room. The
+server does not handle chat messages. It tracks who is in the room and forwards
+the signaling events peers need in order to connect.
 
-### Data flow
+What the server receives:
 
 ```text
-  Browser A                    Signaling server                  Browser B
-  ─────────                    ────────────────                  ─────────
-      │   room:join                    │                              │
-      ├───────────────────────────────►│                              │
-      │◄──── ack: participant roster ──┤                              │
-      │                                │──── participant:joined ─────►│
-      │   webrtc:offer                 │                              │
-      ├───────────────────────────────►│─────────────────────────────►│
-      │                                │◄──────────── webrtc:answer ──┤
-      │◄───────────────────────────────┤                              │
-      │   webrtc:ice-candidate  (both directions, queued if early)    │
-      │◄──────────────────────────────►│◄────────────────────────────►│
-      │                                │                              │
-      │  ═══════════ RTCDataChannel ═══════════════════════════════►  │
-      │      message:create / message:update / message:delete         │
-      │            (server sees none of this)                         │
+room:join              join the room, and get the current roster back
+webrtc:offer           forward this offer to one named participant
+webrtc:answer          forward this answer to one named participant
+webrtc:ice-candidate   forward this candidate to one named participant
+disconnect             the socket closed
 ```
 
-### Signaling versus chat transport
-
-These are two different channels and are never conflated:
-
-| | Socket.IO | RTCDataChannel |
-| --- | --- | --- |
-| Carries | room join, presence, offers, answers, ICE | chat events only |
-| Passes through the server | yes | **no** |
-| Events | `room:join`, `participant:joined`, `participant:left`, `webrtc:offer`, `webrtc:answer`, `webrtc:ice-candidate` | `message:create`, `message:update`, `message:delete` |
-
-The signaling server has no message handler of any kind. The chat protocol lives in the
-frontend and is not importable by the server — it is not in `shared/`.
-
-### Why Socket.IO rather than a raw WebSocket
-
-Presence correctness depends on knowing quickly and reliably when a participant is
-gone. Socket.IO ships a heartbeat, disconnect detection and reconnection with backoff;
-building those on `ws` would have meant writing ping/pong timers, liveness timeouts and
-a reconnect loop before any feature work started. It is used **only** for signaling.
-
-### Module boundaries
+What the server sends:
 
 ```text
-frontend/  React, chat protocol, WebRTC        ─┐
-server/    signaling and room management       ─┼─ both import shared/
-shared/    signaling contracts only            ─┘   never each other
+participant:joined     to everyone already in the room
+participant:left       to the room when a socket closes
+webrtc:offer           to the one participant it is addressed to
+webrtc:answer          to the one participant it is addressed to
+webrtc:ice-candidate   to the one participant it is addressed to
 ```
 
-Inside the client, everything belonging to the chat domain lives under
-`frontend/src/features/chat/`, split into `components/ hooks/ model/ protocol/ rtc/
-signaling/`. The nesting is deliberate: it keeps `app/`, `lib/` and `styles/` free of
-chat concerns, so the domain boundary is visible in the file tree rather than upheld by
-convention, and the transport, protocol and state layers are separated by location.
+Before forwarding anything, the server checks that the sender is the participant
+the payload claims to be, and that both participants are in the same room.
 
-`peerMesh` owns connections, channels and ICE, and transports **opaque strings**. It
-never imports or parses the chat protocol. It surfaces received data through an
-`onMessage` callback carrying the source peer ID and the raw string; `useChatSession`
-calls `parseChatEvent(raw)`, discards `null` results and dispatches the rest to the
-reducer. Keeping the transport ignorant of its payload is what makes the protocol
-testable without WebRTC.
+I chose peer-to-peer because the main work in this exercise is real-time browser
+communication. This design keeps the server small and makes the WebRTC flow
+visible: offers, answers, ICE candidates, connection readiness, and DataChannel
+messages.
 
-## Message protocol
+In practice, each browser connects to every other participant. With `n`
+participants, each browser holds `n - 1` peer connections. That fits small
+standup-style rooms better than large public rooms.
 
-Three events, sent as JSON strings over the DataChannel. Every event identifies the
-message by `messageId`, including creation.
+## Message Protocol
+
+Chat events are JSON strings sent over the WebRTC DataChannel. There are three
+message events:
 
 ```json
 {
@@ -119,7 +104,7 @@ message by `messageId`, including creation.
   "payload": {
     "messageId": "0f5b7a6c-9f1e-4a3e-9c1c-2f0a5a1d7b3e",
     "authorId": "a1c4d0f2-6b7e-4c58-9a2b-13d6f8e0c5a7",
-    "authorName": "Alex",
+    "authorName": "Alex Fisher",
     "text": "Morning, standup in five.",
     "createdAt": "2026-08-29T09:15:04.812Z"
   }
@@ -149,42 +134,83 @@ message by `messageId`, including creation.
 }
 ```
 
-Rules that matter for correctness:
+Important rules:
 
-- **Creation is idempotent by `messageId`.** The author applies its own event locally
-  and also broadcasts it, so a duplicate is normal rather than exceptional.
-- **Ownership is checked against the stored original author**, never against the
-  incoming event alone. An edit or delete claiming someone else's `authorId` is ignored.
-- **Deletion leaves a tombstone.** The timeline item stays so other participants can see
-  that a deletion happened.
-- **Peer data is untrusted.** Parsing returns `null` on malformed input rather than
-  throwing, so a bad frame cannot take down a render.
-- Text is never rendered as HTML. URLs are tokenised and rendered as React anchors —
-  no `dangerouslySetInnerHTML` anywhere.
+- `messageId` identifies the message across create, edit, and delete events.
+- Only the original author can edit or delete a message.
+- Deleted messages stay in the timeline as a "Message deleted" notice.
+- Malformed events are ignored instead of throwing.
+- Message text is rendered as text, not HTML.
 
-## Trade-offs
+## Project Structure
 
-- **Full mesh over an SFU or a relay.** Simple and genuinely peer-to-peer, but every
-  participant holds a connection to every other. With `n` participants there are
-  `n * (n - 1) / 2` connections — fine for a handful, not intended for large rooms.
-- **No global message ordering.** Each DataChannel is reliable and ordered per pair, but
-  several senders give no single authoritative order. Messages appear in local arrival
-  order; no distributed ordering algorithm is implemented.
-- **Client-asserted identity.** Ownership checks are an application rule, not security.
-  A modified client could claim another participant's ID. There is no authentication.
-- **No TURN.** Where a direct path cannot be negotiated — symmetric NAT, restrictive
-  corporate firewalls — there is no relay fallback and the connection fails. Reliable on
-  a LAN and on many home networks; not guaranteed on an arbitrary network.
-- **No history for late joiners.** A participant sees only messages sent after they
-  join. The server stores nothing and peers send no snapshot.
+```text
+frontend/src/
+  app/              application shell
+  features/chat/    chat UI, state, protocol, signaling, and WebRTC
+  lib/              shared frontend utilities
+  styles/           global styles
 
-## Deliberate omissions
+server/src/
+  config/           environment config
+  rooms/            in-memory room and presence state
+  signaling/        Socket.IO handlers and payload validation
 
-- **No Docker.** `pnpm dev` already starts both required processes with one command, so
-  a container adds a build step without removing one.
-- **Attachment and emoji buttons are visibly disabled.** They appear in the design
-  mockup, but the underlying features are unimplemented bonuses. Rendering them as
-  disabled native buttons with accessible names such as `Attach files (not available)`
-  matches the design without pretending the features exist.
-- **No CI, authentication, history sync, typing indicators, read receipts, unread
-  badges or link previews.** All are out of scope for this exercise.
+shared/             signaling contracts used by frontend and server
+```
+
+## Edge Cases
+
+### A participant disconnects and reconnects
+
+Handled. Socket.IO reconnects on its own and the client rejoins the room. The
+roster from that rejoin is authoritative: anyone who left during the outage is
+gone, and anyone who arrived is there.
+
+All peer connections are rebuilt after a rejoin. A channel that survived the
+outage looks the same as one that did not, so the client does not try to tell
+them apart.
+
+Tested by restarting the signaling server with three participants connected. All
+three channels reopened and all three pairs could send messages again.
+
+Closing a window is the simpler case. The server sees the socket close and sends
+`participant:left` to the room.
+
+### A new participant joins, do they see message history?
+
+No. This is a deliberate limit, not a missing feature. The server stores nothing
+and peers do not send a history snapshot, so a participant sees only the messages
+sent after they join.
+
+A page refresh has the same effect. You return to the join screen and your own
+timeline is empty. Your participant ID stays in `sessionStorage`, and the other
+windows still hold every message you sent.
+
+A database would not be the right fix here, because the server would then have to
+receive message content. The peer-to-peer fix is for an existing peer to send a
+snapshot over the DataChannel. That needs rules for which peer answers and what
+happens when two snapshots disagree, so it is left out.
+
+### How does the UI handle a large volume of messages?
+
+Measured with two participants, one of them sending continuously:
+
+| messages | DOM nodes | list height | scroll to top | compose keystroke |
+| --- | --- | --- | --- | --- |
+| 200 | 201 | 18,142px | 0ms | 2ms |
+| 500 | 501 | 45,255px | 0ms | 9ms |
+| 1,000 | 1,001 | 90,442px | 0ms | 3ms |
+| 2,000 | 2,001 | 180,817px | 0ms | 5ms |
+
+There is no virtualization. The list keeps one DOM node per message, so it will
+slow down at some point, but it had not at 2,000.
+
+The list follows new messages only while you are near the bottom. Scrolling up to
+read history stops it following, and scrolling back down resumes it.
+
+That behaviour was worth testing. Under a fast burst the list stopped following
+and never recovered. Auto-scrolling raises scroll events of its own, and during a
+burst one of those can measure a distance against messages that arrived after it.
+New messages and auto-scrolling never move the view up, so only an upward move now
+stops the follow.
