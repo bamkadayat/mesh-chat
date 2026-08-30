@@ -10,4 +10,11 @@ export default defineConfig({
     emptyOutDir: true,
   },
   plugins: [react()],
+  server: {
+    /**
+     * Without this Vite binds IPv6 loopback only, and Firefox refuses to gather
+     * ICE candidates on a page served over ::1, so no DataChannel ever opens.
+     */
+    host: true,
+  },
 });
