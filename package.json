@@ -12,6 +12,7 @@
     "test": "pnpm test:frontend && pnpm test:server",
     "test:frontend": "vitest run --config frontend/vitest.config.ts",
     "test:server": "vitest run --config server/vitest.config.ts",
+    "test:e2e": "playwright test",
     "check": "pnpm lint && pnpm test && pnpm build"
   },
   "dependencies": {
