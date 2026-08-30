@@ -84,6 +84,27 @@ describe('editing', () => {
     expect(screen.queryByLabelText('Edit message')).toBeNull();
   });
 
+  test('the caret opens after the existing text, so typing appends', async () => {
+    const { user } = renderItem();
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const field = screen.getByLabelText<HTMLTextAreaElement>('Edit message');
+    expect(field).toHaveFocus();
+    expect(field.selectionStart).toBe('the original text'.length);
+
+    await user.keyboard(' more');
+    expect(field).toHaveValue('the original text more');
+  });
+
+  test('closing the editor returns focus to the control that opened it', async () => {
+    const { user } = renderItem();
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toHaveFocus();
+  });
+
   test('a rejected edit keeps the field open so the text is not lost', async () => {
     const onEdit = vi.fn(() => false);
     render(

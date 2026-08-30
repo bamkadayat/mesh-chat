@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type SubmitEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from 'react';
 import { MAX_MESSAGE_LENGTH } from '../../../model/constants';
 import type { ChatMessage } from '../../../model/types';
 import { linkify } from '../../../protocol/linkify';
@@ -37,8 +37,31 @@ function MessageText({ text }: { text: string }) {
 
 export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemProps) {
   const [draft, setDraft] = useState<string | null>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  const wasEditing = useRef(false);
   const isDeleted = message.deletedAt !== null;
   const isEditing = draft !== null;
+
+  /**
+   * autoFocus would leave the caret before the existing text, so typing would
+   * prepend. Place it at the end, where someone amending a message expects it.
+   */
+  useEffect(() => {
+    const field = fieldRef.current;
+    if (isEditing && field !== null) {
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+    }
+  }, [isEditing]);
+
+  /** Closing the editor must put focus back on the control that opened it. */
+  useEffect(() => {
+    if (wasEditing.current && !isEditing) {
+      editButtonRef.current?.focus();
+    }
+    wasEditing.current = isEditing;
+  }, [isEditing]);
 
   /** A deleted message keeps its tombstone, so there is nothing left to act on. */
   const canAct = isOwn && !isDeleted;
@@ -83,11 +106,11 @@ export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemPro
           </label>
           <textarea
             id={`edit-${message.messageId}`}
+            ref={fieldRef}
             className={styles.editField}
             value={draft}
             rows={2}
             maxLength={MAX_MESSAGE_LENGTH}
-            autoFocus
             onChange={(event) => {
               setDraft(event.target.value);
             }}
@@ -125,6 +148,7 @@ export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemPro
         <div className={styles.actions}>
           <button
             type="button"
+            ref={editButtonRef}
             className={styles.action}
             onClick={() => {
               setDraft(message.text);

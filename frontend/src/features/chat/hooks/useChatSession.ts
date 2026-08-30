@@ -29,6 +29,8 @@ export type ChatSession = {
   status: SessionStatus;
   errorReason: SessionErrorReason | null;
   participants: Participant[];
+  /** Present through signaling, but their DataChannel is not open yet. */
+  connectingIds: string[];
   timeline: TimelineItem[];
   readiness: ComposerReadiness;
   localParticipantId: string;
@@ -55,6 +57,8 @@ export function useChatSession(signalingUrl: string): ChatSession {
   const [chat, dispatch] = useReducer(chatReducer, initialChatState);
 
   const sessionRef = useRef<ActiveSession | null>(null);
+  /** Peer IDs the mesh currently holds, so a rejoin can rebuild every one. */
+  const meshPeerIds = useRef<Set<string>>(new Set());
   const [localParticipantId, setLocalParticipantId] = useState('');
 
   const addSystemEvent = useCallback((event: Omit<SystemEvent, 'eventId'>): void => {
@@ -64,6 +68,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
   const closeSession = useCallback((): void => {
     const session = sessionRef.current;
     sessionRef.current = null;
+    meshPeerIds.current.clear();
 
     if (session === null) {
       return;
@@ -138,6 +143,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
           void mesh.handleIceCandidate(fromParticipantId, candidate);
         }),
         signaling.onParticipantJoined((participant) => {
+          meshPeerIds.current.add(participant.participantId);
           setParticipants((current) =>
             current.some((entry) => entry.participantId === participant.participantId)
               ? current
@@ -166,7 +172,38 @@ export function useChatSession(signalingUrl: string): ChatSession {
             delete next[participantId];
             return next;
           });
+          meshPeerIds.current.delete(participantId);
           mesh.removePeer(participantId);
+        }),
+        /**
+         * Socket.IO reconnects and rejoins the room by itself. The roster it
+         * returns is authoritative, and every channel is rebuilt: a channel
+         * that survived the outage cannot be told apart from one that did not.
+         */
+        signaling.onRejoin((outcome) => {
+          if (!outcome.ok) {
+            setErrorReason('join-rejected');
+            setStatus('error');
+            return;
+          }
+
+          for (const peerId of meshPeerIds.current) {
+            mesh.removePeer(peerId);
+          }
+          meshPeerIds.current.clear();
+          setChannelStates({});
+          setParticipants([identity, ...outcome.participants]);
+
+          /**
+           * The same rule as a first join: the roster only lists participants
+           * who rejoined earlier, so exactly one side of each pair offers.
+           * Comparing IDs instead would deadlock whenever the offering side
+           * rejoined first and saw an empty roster.
+           */
+          for (const existing of outcome.participants) {
+            meshPeerIds.current.add(existing.participantId);
+            void mesh.connectToPeer(existing.participantId);
+          }
         }),
         signaling.onConnectionChange((state) => {
           if (state === 'failed') {
@@ -196,6 +233,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
 
       /** Only the newcomer offers, which is what keeps two offers from crossing. */
       for (const existing of outcome.participants) {
+        meshPeerIds.current.add(existing.participantId);
         void mesh.connectToPeer(existing.participantId);
       }
     },
@@ -292,10 +330,23 @@ export function useChatSession(signalingUrl: string): ChatSession {
     [participants, localParticipantId, channelStates],
   );
 
+  /** Presence arrives before the channel opens, so each peer is marked on its own. */
+  const connectingIds = useMemo(
+    (): string[] =>
+      participants
+        .map((participant) => participant.participantId)
+        .filter(
+          (participantId) =>
+            participantId !== localParticipantId && channelStates[participantId] !== 'open',
+        ),
+    [participants, localParticipantId, channelStates],
+  );
+
   return {
     status,
     errorReason,
     participants,
+    connectingIds,
     timeline: chat.timeline,
     readiness,
     localParticipantId,

@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { TimelineItem } from '../../../model/types';
 import { MessageItem } from './MessageItem';
 import { SystemEventItem } from './SystemEventItem';
 import styles from './MessageList.module.css';
 
-/** Anything within this many pixels of the bottom counts as reading the latest. */
+/** Close enough to the bottom to keep following new messages. */
 const NEAR_BOTTOM_PX = 48;
 
 type MessageListProps = {
@@ -21,21 +21,34 @@ export function MessageList({
   onDelete,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const wasNearBottom = useRef(true);
+  const follow = useRef(true);
+  const lastTop = useRef(0);
 
-  /** Follow new messages only when the reader has not scrolled up to read history. */
-  useEffect(() => {
+  /** Pin before paint, so arriving messages never show a half-scrolled frame. */
+  useLayoutEffect(() => {
     const region = scrollRef.current;
-    if (region !== null && wasNearBottom.current) {
+    if (region !== null && follow.current) {
       region.scrollTop = region.scrollHeight;
+      lastTop.current = region.scrollTop;
     }
   }, [timeline]);
 
+  /**
+   * Treat only upward scrolling as the reader choosing history.
+   * Auto-pinning and new messages should never mark them as scrolled away.
+   */
   function handleScroll(): void {
     const region = scrollRef.current;
-    if (region !== null) {
-      const distance = region.scrollHeight - region.scrollTop - region.clientHeight;
-      wasNearBottom.current = distance <= NEAR_BOTTOM_PX;
+    if (region === null) {
+      return;
+    }
+
+    const movedUp = region.scrollTop < lastTop.current;
+    lastTop.current = region.scrollTop;
+
+    const distance = region.scrollHeight - region.scrollTop - region.clientHeight;
+    if (movedUp || distance <= NEAR_BOTTOM_PX) {
+      follow.current = distance <= NEAR_BOTTOM_PX;
     }
   }
 

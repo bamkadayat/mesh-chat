@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Participant } from '../../../../../../shared/signalingEvents';
 import type { ComposerReadiness, SessionStatus, TimelineItem } from '../../model/types';
+import { connectionAnnouncement } from './connectionAnnouncement';
 import { MessageComposer } from './composer/MessageComposer';
 import { MessageList } from './messages/MessageList';
 import { ParticipantList } from './participants/ParticipantList';
@@ -65,10 +66,16 @@ export function ChatPanel({
         <ChatTabs tabs={tabs} participantCount={participants.length} unread={unread} />
 
         {status === 'reconnecting' && (
-          <p className={`${styles.status} ${styles.statusError}`} role="status">
+          <p className={`${styles.status} ${styles.statusError}`} aria-hidden="true">
             Reconnecting to the chat server…
           </p>
         )}
+
+        {/* One region that stays mounted, so a screen reader reads each change
+            instead of only what happens to be present when it first appears. */}
+        <p className="visually-hidden" role="status">
+          {connectionAnnouncement(status, readiness)}
+        </p>
 
         <div
           className={styles.content}

@@ -33,19 +33,11 @@ export function ChatFeature() {
     );
   }
 
-  /** Anyone present whose data channel is not open yet is marked in the list. */
-  const connectingIds = session.participants
-    .map((participant) => participant.participantId)
-    .filter(
-      (participantId) =>
-        participantId !== session.localParticipantId && session.readiness !== 'open',
-    );
-
   return (
     <ChatPanel
       status={session.status}
       participants={session.participants}
-      connectingIds={connectingIds}
+      connectingIds={session.connectingIds}
       timeline={session.timeline}
       readiness={session.readiness}
       localParticipantId={session.localParticipantId}
