@@ -12,7 +12,17 @@ test('blank input is never sent', async () => {
   await user.keyboard('{Enter}');
 
   expect(onSend).not.toHaveBeenCalled();
-  expect(screen.queryByRole('button', { name: 'Send message' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+});
+
+test('the send button becomes usable as soon as there is real text', async () => {
+  render(<MessageComposer readiness="open" onSend={() => true} />);
+  const user = userEvent.setup();
+  const send = screen.getByRole('button', { name: 'Send message' });
+
+  expect(send).toBeDisabled();
+  await user.type(screen.getByLabelText('Write to everyone'), 'hi');
+  expect(send).toBeEnabled();
 });
 
 test('a message is trimmed, sent and cleared', async () => {

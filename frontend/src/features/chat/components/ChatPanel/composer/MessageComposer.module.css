@@ -2,27 +2,17 @@
   margin: 0 1.5rem 1.25rem;
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  justify-content: center;
-}
-
-/* The field holds the text and the emoji button, while attach and send sit
-   outside it. Its radius matches the tab strip above so the panel edges line up. */
+/* One bordered box holding the field and the action row, as the mockup shows. */
 .field {
   display: flex;
-  flex: 1;
-  align-items: center;
-  min-width: 0;
-  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  flex-direction: column;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
-  background: var(--color-input);
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
-/* The field carries the focus ring, so the outline follows the shape a
+/* The box carries the focus ring, so the outline follows the shape a
    participant perceives as the input rather than the bare textarea. */
 .field:focus-within {
   outline: 2px solid var(--color-accent);
@@ -31,10 +21,8 @@
 
 .input {
   overflow-y: auto;
-  flex: 1;
-  min-width: 0;
   max-height: 6rem;
-  padding: 0.25rem 0;
+  padding: 0;
   border: 0;
   background: none;
   line-height: 1.5rem;
@@ -49,30 +37,40 @@
   color: var(--color-text-muted);
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 .action,
 .send {
   display: grid;
-  flex: none;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  width: 2.5rem;
+  height: 2.5rem;
   border: 0;
   border-radius: 50%;
   background: none;
+  color: var(--color-text-muted);
   place-items: center;
 }
 
-/* Attach and emoji are demo placeholders: present in the design, but not
-   wired to anything, so they are muted and inert. */
-.action:disabled {
-  color: var(--color-text-muted);
-  cursor: not-allowed;
+.send {
+  margin-left: auto;
 }
 
-/* Larger than the placeholder icons: it is the one control here that acts. */
-.send {
-  width: 2.5rem;
-  height: 2.5rem;
+/* Attach and emoji are placeholders the mockup shows but nothing implements.
+   Dimmed just enough to read as unavailable beside the send arrow, without
+   fading out of the composer the mockup draws. */
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Send is the one control that becomes usable. The mockup only draws the
+   resting state, which is the same muted grey as the placeholders, so the
+   active colour is the accent every other live control in the panel uses. */
+.send:enabled {
   color: var(--color-accent);
 }
 
@@ -80,10 +78,7 @@
   background: var(--color-track);
 }
 
-/* Send is a different kind of disabled: it only shows once there is text, and
-   greys out while the mesh is not ready to carry it. */
 .send:disabled {
-  color: var(--color-text-muted);
   cursor: not-allowed;
 }
 

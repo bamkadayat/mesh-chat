@@ -41,8 +41,7 @@ export function MessageComposer({ readiness, onSend }: MessageComposerProps) {
   }, [draft]);
 
   const notice = readinessNotice(readiness);
-  const hasDraft = draft.trim() !== '';
-  const canSend = readiness === 'open' && hasDraft;
+  const canSend = readiness === 'open' && draft.trim() !== '';
 
   /**
    * Readiness is checked here as well as on the button, and the field is cleared
@@ -69,42 +68,44 @@ export function MessageComposer({ readiness, onSend }: MessageComposerProps) {
 
   return (
     <form className={styles.composer} onSubmit={handleSubmit}>
-      <div className={styles.row}>
-        <button
-          type="button"
-          className={styles.action}
-          disabled
-          aria-label="Attach files (not available in this demo)"
-        >
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <path
-              d="M12 5.5v13M5.5 12h13"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+      {/* One bordered box holding the field and the action row, as the mockup
+          shows. The box carries the focus ring, not the bare textarea. */}
+      <div className={styles.field}>
+        <label className="visually-hidden" htmlFor={fieldId}>
+          Write to everyone
+        </label>
+        <textarea
+          id={fieldId}
+          ref={fieldRef}
+          className={styles.input}
+          value={draft}
+          placeholder="Write to everyone"
+          rows={1}
+          maxLength={MAX_MESSAGE_LENGTH}
+          aria-describedby={notice === '' ? undefined : noticeId}
+          onChange={(event) => {
+            setDraft(event.target.value);
+          }}
+          onKeyDown={handleKeyDown}
+        />
 
-        <div className={styles.field}>
-          <label className="visually-hidden" htmlFor={fieldId}>
-            Write to everyone
-          </label>
-          <textarea
-            id={fieldId}
-            ref={fieldRef}
-            className={styles.input}
-            value={draft}
-            placeholder="Write to everyone"
-            rows={1}
-            maxLength={MAX_MESSAGE_LENGTH}
-            aria-describedby={notice === '' ? undefined : noticeId}
-            onChange={(event) => {
-              setDraft(event.target.value);
-            }}
-            onKeyDown={handleKeyDown}
-          />
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.action}
+            disabled
+            aria-label="Attach files (not available in this demo)"
+          >
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path
+                d="M12 3.5v17M3.5 12h17"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
 
           <button
             type="button"
@@ -112,24 +113,22 @@ export function MessageComposer({ readiness, onSend }: MessageComposerProps) {
             disabled
             aria-label="Choose emoji (not available in this demo)"
           >
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true">
               <path
                 fill="currentColor"
                 d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-3.5 7a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm7 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM12 17.5c-2.3 0-4.3-1.4-5.1-3.5h10.2c-.8 2.1-2.8 3.5-5.1 3.5z"
               />
             </svg>
           </button>
-        </div>
 
-        {/* Send appears only once there is something to send, so an empty
-            composer stays as uncluttered as the design. */}
-        {hasDraft && (
+          {/* Always present, so the row never changes shape as you type.
+              Attach and emoji are never enabled; this one is, once there is text. */}
           <button type="submit" className={styles.send} disabled={!canSend} aria-label="Send message">
             <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
               <path fill="currentColor" d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
             </svg>
           </button>
-        )}
+        </div>
       </div>
 
       {notice !== '' && (
