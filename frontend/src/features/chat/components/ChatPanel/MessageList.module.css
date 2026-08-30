@@ -1,0 +1,14 @@
+.scroll {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.list {
+  display: flex;
+  margin: 0;
+  padding: 1rem 1.5rem 0.75rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  list-style: none;
+}

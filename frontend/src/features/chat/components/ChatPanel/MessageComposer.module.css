@@ -1,0 +1,94 @@
+.composer {
+  margin: 0 1.5rem 1.25rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  justify-content: center;
+}
+
+/* The field holds the text and the emoji button, while attach and send sit
+   outside it. Its radius matches the tab strip above so the panel edges line up. */
+.field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  border-radius: var(--radius-control);
+  background: var(--color-input);
+  gap: 0.25rem;
+}
+
+/* The field carries the focus ring, so the outline follows the shape a
+   participant perceives as the input rather than the bare textarea. */
+.field:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.input {
+  overflow-y: auto;
+  flex: 1;
+  min-width: 0;
+  max-height: 6rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  line-height: 1.5rem;
+  resize: none;
+}
+
+.input:focus-visible {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.action,
+.send {
+  display: grid;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  place-items: center;
+}
+
+/* Attach and emoji are demo placeholders: present in the design, but not
+   wired to anything, so they are muted and inert. */
+.action:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+/* Larger than the placeholder icons: it is the one control here that acts. */
+.send {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--color-accent);
+}
+
+.send:hover:enabled {
+  background: var(--color-track);
+}
+
+/* Send is a different kind of disabled: it only shows once there is text, and
+   greys out while the mesh is not ready to carry it. */
+.send:disabled {
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.notice {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}

@@ -1,0 +1,31 @@
+.item {
+  display: grid;
+  align-items: center;
+  padding: 0.5rem 0;
+  gap: 0.5rem;
+  grid-template-columns: auto 1fr auto;
+}
+
+.icon {
+  display: grid;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  color: var(--color-panel);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 700;
+  place-items: center;
+}
+
+.text {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.time {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}

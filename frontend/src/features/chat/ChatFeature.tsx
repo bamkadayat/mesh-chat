@@ -1,6 +1,5 @@
-import { useState, type SubmitEvent } from 'react';
+import { ChatPanel } from './components/ChatPanel/ChatPanel';
 import { JoinScreen } from './components/JoinScreen/JoinScreen';
-import { MAX_MESSAGE_LENGTH } from './model/constants';
 import { useChatSession } from './hooks/useChatSession';
 import type { SessionErrorReason } from './model/types';
 
@@ -21,7 +20,6 @@ function errorText(reason: SessionErrorReason): string {
 
 export function ChatFeature() {
   const session = useChatSession(SIGNALING_URL);
-  const [draft, setDraft] = useState('');
 
   if (session.status === 'idle' || session.status === 'connecting' || session.status === 'error') {
     return (
@@ -35,68 +33,23 @@ export function ChatFeature() {
     );
   }
 
-  /** Temporary session view. The mockup panel replaces it in the next step. */
-  /**
-   * Readiness is re-checked here, not just on the button. It can change between
-   * render and submit, and the field is cleared only once the send is accepted.
-   */
-  function handleSend(event: SubmitEvent<HTMLFormElement>): void {
-    event.preventDefault();
-
-    const text = draft.trim();
-    if (text === '' || session.readiness !== 'open') {
-      return;
-    }
-
-    if (session.sendMessage(text)) {
-      setDraft('');
-    }
-  }
+  /** Anyone present whose data channel is not open yet is marked in the list. */
+  const connectingIds = session.participants
+    .map((participant) => participant.participantId)
+    .filter(
+      (participantId) =>
+        participantId !== session.localParticipantId && session.readiness !== 'open',
+    );
 
   return (
-    <section>
-      <p role="status">
-        {session.status === 'reconnecting'
-          ? 'Reconnecting to the chat server…'
-          : `Connected · ${session.readiness}`}{' '}
-        <button type="button" onClick={session.leave}>
-          Leave
-        </button>
-      </p>
-
-      <p>
-        participants ({session.participants.length}):{' '}
-        {session.participants.map((participant) => participant.displayName).join(', ')}
-      </p>
-
-      <ul>
-        {session.timeline.map((item) =>
-          item.kind === 'message' ? (
-            <li key={item.message.messageId}>
-              <b>{item.message.authorName}</b>: {item.message.text}
-            </li>
-          ) : (
-            <li key={item.event.eventId}>
-              {item.event.displayName} {item.event.type}
-            </li>
-          ),
-        )}
-      </ul>
-
-      <form onSubmit={handleSend}>
-        <label htmlFor="draft">Message</label>{' '}
-        <input
-          id="draft"
-          maxLength={MAX_MESSAGE_LENGTH}
-          value={draft}
-          onChange={(event) => {
-            setDraft(event.target.value);
-          }}
-        />{' '}
-        <button type="submit" disabled={session.readiness !== 'open'}>
-          Send
-        </button>
-      </form>
-    </section>
+    <ChatPanel
+      status={session.status}
+      participants={session.participants}
+      connectingIds={connectingIds}
+      timeline={session.timeline}
+      readiness={session.readiness}
+      onSend={session.sendMessage}
+      onLeave={session.leave}
+    />
   );
 }
