@@ -8,19 +8,37 @@ type JoinScreenProps = {
   connectionError: string | null;
 };
 
+/**
+ * Names are presentation only and collisions are still allowed, so this asks
+ * for a full name to make them less likely rather than to guarantee anything.
+ * Inner whitespace is collapsed so "Bam   Kadayat" and "Bam Kadayat" match.
+ */
+function validateDisplayName(value: string): { name: string; error: string | null } {
+  const name = value.trim().replace(/\s+/g, ' ');
+
+  if (name === '') {
+    return { name, error: 'Enter a display name to join.' };
+  }
+  if (!name.includes(' ')) {
+    return { name, error: 'Enter your first and last name, so others can tell you apart.' };
+  }
+
+  return { name, error: null };
+}
+
 export function JoinScreen({ onJoin, isJoining, connectionError }: JoinScreenProps) {
   const [name, setName] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const nameInputId = useId();
   const messageId = useId();
 
-  /** The name is trimmed here so what you join with is what everyone sees. */
+  /** The name is normalised here so what you join with is what everyone sees. */
   function handleSubmit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
 
-    const displayName = name.trim();
-    if (displayName === '') {
-      setValidationError('Enter a display name to join.');
+    const { name: displayName, error } = validateDisplayName(name);
+    if (error !== null) {
+      setValidationError(error);
       return;
     }
 
@@ -45,7 +63,8 @@ export function JoinScreen({ onJoin, isJoining, connectionError }: JoinScreenPro
           type="text"
           value={name}
           maxLength={MAX_DISPLAY_NAME_LENGTH}
-          autoComplete="off"
+          autoComplete="name"
+          placeholder="First and last name"
           autoFocus
           disabled={isJoining}
           aria-invalid={validationError !== null}
@@ -62,7 +81,7 @@ export function JoinScreen({ onJoin, isJoining, connectionError }: JoinScreenPro
         )}
 
         <button className={styles.submit} type="submit" disabled={isJoining}>
-          {isJoining ? 'Connecting…' : 'Join'}
+          {isJoining ? 'Connecting…' : 'Join the standup'}
         </button>
       </form>
     </main>

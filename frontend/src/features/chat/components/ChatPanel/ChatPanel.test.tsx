@@ -1,13 +1,13 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Participant } from '../../../../../../shared/signalingEvents';
 import type { SessionStatus, TimelineItem } from '../../model/types';
 import { ChatPanel } from './ChatPanel';
 
 const PARTICIPANTS: Participant[] = [
-  { participantId: 'p-me', displayName: 'Alex' },
-  { participantId: 'p-bea', displayName: 'Bea' },
+  { participantId: 'p-me', displayName: 'Alex Fisher' },
+  { participantId: 'p-bea', displayName: 'Bea Fisher' },
 ];
 
 function messageItem(messageId: string, text: string): TimelineItem {
@@ -16,7 +16,7 @@ function messageItem(messageId: string, text: string): TimelineItem {
     message: {
       messageId,
       authorId: 'p-bea',
-      authorName: 'Bea',
+      authorName: 'Bea Fisher',
       text,
       createdAt: '2026-08-30T09:15:00.000Z',
       editedAt: null,
@@ -109,9 +109,9 @@ describe('presence', () => {
 
     const rows = screen.getAllByRole('listitem');
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent('Alex');
+    expect(rows[0]).toHaveTextContent('Alex Fisher');
     expect(rows[0]).not.toHaveTextContent('Connecting');
-    expect(rows[1]).toHaveTextContent('Bea');
+    expect(rows[1]).toHaveTextContent('Bea Fisher');
     expect(rows[1]).toHaveTextContent('Connecting…');
   });
 
@@ -120,6 +120,22 @@ describe('presence', () => {
     await user.click(tab(/Participants/));
 
     expect(screen.queryByText('Connecting…')).toBeNull();
+  });
+});
+
+describe('names', () => {
+  test('the participant list shows full names and the chat shows first names', async () => {
+    const { user } = renderPanel({ timeline: [messageItem('m-1', 'hello')] });
+
+    /** Both panels stay mounted, so assert against the visible one only. */
+    const chat = within(screen.getByRole('tabpanel'));
+    expect(chat.getByText('Bea')).toBeInTheDocument();
+    expect(chat.queryByText('Bea Fisher')).toBeNull();
+
+    await user.click(tab(/Participants/));
+    const people = within(screen.getByRole('tabpanel'));
+    expect(people.getByText('Bea Fisher')).toBeInTheDocument();
+    expect(people.queryByText('Bea')).toBeNull();
   });
 });
 

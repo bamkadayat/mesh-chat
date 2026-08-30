@@ -16,25 +16,53 @@ describe('JoinScreen', () => {
   it('joins with the entered name', async () => {
     const { onJoin, user } = renderJoinScreen();
 
-    await user.type(screen.getByLabelText('Display name'), 'Alex');
-    await user.click(screen.getByRole('button', { name: 'Join' }));
+    await user.type(screen.getByLabelText('Display name'), 'Alex Fisher');
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
-    expect(onJoin).toHaveBeenCalledWith('Alex');
+    expect(onJoin).toHaveBeenCalledWith('Alex Fisher');
   });
 
   it('trims surrounding whitespace from the name', async () => {
     const { onJoin, user } = renderJoinScreen();
 
-    await user.type(screen.getByLabelText('Display name'), '  Alex  ');
-    await user.click(screen.getByRole('button', { name: 'Join' }));
+    await user.type(screen.getByLabelText('Display name'), '  Alex Fisher  ');
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
-    expect(onJoin).toHaveBeenCalledWith('Alex');
+    expect(onJoin).toHaveBeenCalledWith('Alex Fisher');
+  });
+
+  it('collapses inner whitespace so spacing cannot make two names differ', async () => {
+    const { onJoin, user } = renderJoinScreen();
+
+    await user.type(screen.getByLabelText('Display name'), 'Alex   Fisher');
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
+
+    expect(onJoin).toHaveBeenCalledWith('Alex Fisher');
+  });
+
+  it('does not join with a single word, and says why', async () => {
+    const { onJoin, user } = renderJoinScreen();
+
+    await user.type(screen.getByLabelText('Display name'), 'Alex');
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
+
+    expect(onJoin).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('first and last name');
+  });
+
+  it('accepts a name of more than two words', async () => {
+    const { onJoin, user } = renderJoinScreen();
+
+    await user.type(screen.getByLabelText('Display name'), 'Ada Byron Lovelace');
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
+
+    expect(onJoin).toHaveBeenCalledWith('Ada Byron Lovelace');
   });
 
   it('does not join with an empty name', async () => {
     const { onJoin, user } = renderJoinScreen();
 
-    await user.click(screen.getByRole('button', { name: 'Join' }));
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
     expect(onJoin).not.toHaveBeenCalled();
   });
@@ -43,7 +71,7 @@ describe('JoinScreen', () => {
     const { onJoin, user } = renderJoinScreen();
 
     await user.type(screen.getByLabelText('Display name'), '   ');
-    await user.click(screen.getByRole('button', { name: 'Join' }));
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
     expect(onJoin).not.toHaveBeenCalled();
   });
@@ -51,7 +79,7 @@ describe('JoinScreen', () => {
   it('explains why an empty name was rejected', async () => {
     const { user } = renderJoinScreen();
 
-    await user.click(screen.getByRole('button', { name: 'Join' }));
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a display name to join.');
   });
@@ -60,7 +88,7 @@ describe('JoinScreen', () => {
     const { user } = renderJoinScreen();
     const input = screen.getByLabelText('Display name');
 
-    await user.click(screen.getByRole('button', { name: 'Join' }));
+    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAccessibleDescription('Enter a display name to join.');
@@ -86,7 +114,7 @@ describe('JoinScreen', () => {
   it('keeps the form usable after a failure so the user can retry', () => {
     renderJoinScreen({ connectionError: 'Cannot reach the chat server.' });
 
-    expect(screen.getByRole('button', { name: 'Join' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Join the standup' })).toBeEnabled();
     expect(screen.getByLabelText('Display name')).toBeEnabled();
   });
 

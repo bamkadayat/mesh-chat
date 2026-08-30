@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } fro
 import { MAX_MESSAGE_LENGTH } from '../../../model/constants';
 import type { ChatMessage } from '../../../model/types';
 import { linkify } from '../../../protocol/linkify';
+import { firstName } from './firstName';
 import { formatTime } from './formatTime';
 import styles from './MessageItem.module.css';
 
@@ -93,7 +94,7 @@ export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemPro
   return (
     <li className={styles.item}>
       <p className={styles.header}>
-        <span className={styles.author}>{message.authorName}</span>
+        <span className={styles.author}>{firstName(message.authorName)}</span>
         <time className={styles.time} dateTime={message.createdAt}>
           {formatTime(message.createdAt)}
         </time>

@@ -1,4 +1,5 @@
 import type { SystemEvent } from '../../../model/types';
+import { firstName } from './firstName';
 import { formatTime } from './formatTime';
 import styles from './SystemEventItem.module.css';
 
@@ -15,7 +16,7 @@ export function SystemEventItem({ event }: { event: SystemEvent }) {
         i
       </span>
       <span className={styles.text}>
-        {event.displayName} {ACTION_TEXT[event.type]}
+        {firstName(event.displayName)} {ACTION_TEXT[event.type]}
       </span>
       <time className={styles.time} dateTime={event.occurredAt}>
         {formatTime(event.occurredAt)}
