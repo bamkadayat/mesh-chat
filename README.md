@@ -40,7 +40,7 @@ pnpm test:server
 pnpm test:e2e
 ```
 
-There are 173 unit tests and one end-to-end test.
+There are 176 unit tests and one end-to-end test.
 
 The tests focus on the parts that are easy to check in isolation: the protocol,
 reducer, link handling, and ID generation. Component tests cover visible user
@@ -291,6 +291,41 @@ typing states if a stop event is missed.
 
 Read receipts, message history, virtualization, Docker, link previews, and
 end-to-end encryption are not implemented.
+
+## Error Handling
+
+The app treats anything from the network as untrusted. Bad input is rejected or ignored
+instead of crashing the app. User-facing errors are mapped to simple reasons, so raw
+Socket.IO or WebRTC errors never appear on screen.
+
+### In the browser
+
+- **Errors use simple reasons.** The app uses `server-unreachable` and `join-rejected`,
+  then turns them into readable messages in the UI.
+- **Joining cannot hang forever.** The join request has a ten second timeout. If the
+  server does not answer, it becomes `no-response`.
+- **Bad peer messages are ignored.** `parsePeerEvent` returns `null` for invalid JSON,
+  unknown events, or invalid message data.
+- **WebRTC failures become state.** If a peer connection cannot be created or negotiation
+  fails, that peer is marked as `failed` and the reason is logged to the console.
+- **Typed text is not lost.** If sending or editing is rejected, the composer keeps the
+  draft.
+- **Failed is different from connecting.** A dead peer shows as `failed`, not as a slow
+  connection.
+- **Signaling recovers on its own, a dead peer does not.** A dropped signaling connection
+  reconnects and rebuilds every channel. A peer channel that fails is not retried, and the
+  composer says to leave and rejoin rather than accepting messages that would go nowhere.
+
+### On the server
+
+- **Payloads are validated before use.** Runtime checks start from `unknown`.
+- **Bad joins get a reply.** The server returns `{ ok: false, reason: 'invalid-payload' }`.
+- **Bad signals are dropped.** Invalid WebRTC offers, answers, or ICE candidates are
+  ignored.
+- **Impersonation is blocked.** A signal is forwarded only if the socket owns the
+  participant ID it claims.
+- **Signals stay inside the room.** The server forwards only to participants in the same
+  room.
 
 ## Trade-offs
 
