@@ -4,6 +4,7 @@ import {
   type Participant,
 } from '../../../../../shared/signalingEvents';
 import { createId } from '../../../lib/createId';
+import { TYPING_EXPIRY_MS } from '../model/constants';
 import { loadParticipantId } from '../model/identity';
 import { chatReducer, initialChatState } from '../model/reducer';
 import type {
@@ -15,7 +16,9 @@ import type {
 } from '../model/types';
 import {
   parseChatEvent,
+  parsePeerEvent,
   serializeChatEvent,
+  serializeTypingEvent,
   type ChatEvent,
 } from '../protocol/protocol';
 import { createPeerMesh, type ChannelState, type PeerMesh } from '../rtc/peerMesh';
@@ -31,6 +34,8 @@ export type ChatSession = {
   participants: Participant[];
   /** Present through signaling, but their DataChannel is not open yet. */
   connectingIds: string[];
+  /** Other participants currently typing, by display name. */
+  typingNames: string[];
   timeline: TimelineItem[];
   readiness: ComposerReadiness;
   localParticipantId: string;
@@ -40,6 +45,8 @@ export type ChatSession = {
   sendMessage: (text: string) => boolean;
   editMessage: (messageId: string, text: string) => boolean;
   deleteMessage: (messageId: string) => boolean;
+  /** Tells peers whether this participant is composing. Safe to call often. */
+  setTyping: (isTyping: boolean) => void;
 };
 
 type ActiveSession = {
@@ -54,6 +61,8 @@ export function useChatSession(signalingUrl: string): ChatSession {
   const [errorReason, setErrorReason] = useState<SessionErrorReason | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [channelStates, setChannelStates] = useState<Record<string, ChannelState>>({});
+  /** Peer ID to the time their typing state stops counting. */
+  const [typingUntil, setTypingUntil] = useState<Record<string, number>>({});
   const [chat, dispatch] = useReducer(chatReducer, initialChatState);
 
   const sessionRef = useRef<ActiveSession | null>(null);
@@ -111,10 +120,29 @@ export function useChatSession(signalingUrl: string): ChatSession {
 
       const mesh = createPeerMesh({
         onMessage: ({ sourcePeerId, raw }) => {
-          const event = parseChatEvent(raw);
+          const event = parsePeerEvent(raw);
+          if (event === null) {
+            return;
+          }
 
           /** A peer may only speak for itself, whatever the payload claims. */
-          if (event === null || event.payload.authorId !== sourcePeerId) {
+          if (event.type === 'typing:changed') {
+            if (event.payload.participantId !== sourcePeerId) {
+              return;
+            }
+            setTypingUntil((current) => {
+              const next = { ...current };
+              if (event.payload.isTyping) {
+                next[sourcePeerId] = Date.now() + TYPING_EXPIRY_MS;
+              } else {
+                delete next[sourcePeerId];
+              }
+              return next;
+            });
+            return;
+          }
+
+          if (event.payload.authorId !== sourcePeerId) {
             return;
           }
           dispatch({ kind: 'chat-event', event });
@@ -208,6 +236,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
           }
           meshPeerIds.current.clear();
           setChannelStates({});
+          setTypingUntil({});
           writeParticipants([identity, ...outcome.participants]);
 
           /**
@@ -262,6 +291,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
     setErrorReason(null);
     writeParticipants([]);
     setChannelStates({});
+    setTypingUntil({});
   }, [closeSession, writeParticipants]);
 
   /**
@@ -341,6 +371,60 @@ export function useChatSession(signalingUrl: string): ChatSession {
     [applyAndBroadcast],
   );
 
+  /** Reading the map is enough: the effect below drops entries once they lapse. */
+  const typingNames = useMemo(
+    (): string[] =>
+      participants
+        .filter(
+          (participant) =>
+            participant.participantId !== localParticipantId &&
+            participant.participantId in typingUntil,
+        )
+        .map((participant) => participant.displayName),
+    [participants, localParticipantId, typingUntil],
+  );
+
+  /**
+   * Peers announce that they stopped, but a dropped channel never will, so an
+   * entry that nothing refreshes is cleared here once it lapses.
+   */
+  useEffect(() => {
+    const soonest = Math.min(...Object.values(typingUntil));
+    if (!Number.isFinite(soonest)) {
+      return;
+    }
+
+    const timer = setTimeout(
+      () => {
+        setTypingUntil((current) => {
+          const now = Date.now();
+          return Object.fromEntries(
+            Object.entries(current).filter(([, until]) => until > now),
+          );
+        });
+      },
+      Math.max(soonest - Date.now(), 0) + 50,
+    );
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [typingUntil]);
+
+  const setTyping = useCallback((isTyping: boolean): void => {
+    const session = sessionRef.current;
+    if (session === null) {
+      return;
+    }
+
+    session.mesh.broadcast(
+      serializeTypingEvent({
+        type: 'typing:changed',
+        payload: { participantId: session.identity.participantId, isTyping },
+      }),
+    );
+  }, []);
+
   const readiness = useMemo(
     (): ComposerReadiness => deriveReadiness(participants, localParticipantId, channelStates),
     [participants, localParticipantId, channelStates],
@@ -363,6 +447,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
     errorReason,
     participants,
     connectingIds,
+    typingNames,
     timeline: chat.timeline,
     readiness,
     localParticipantId,
@@ -371,6 +456,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
     sendMessage,
     editMessage,
     deleteMessage,
+    setTyping,
   };
 }
 

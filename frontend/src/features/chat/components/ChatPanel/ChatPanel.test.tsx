@@ -26,7 +26,12 @@ function messageItem(messageId: string, text: string): TimelineItem {
 }
 
 function renderPanel(
-  overrides: { status?: SessionStatus; timeline?: TimelineItem[]; connectingIds?: string[] } = {},
+  overrides: {
+    status?: SessionStatus;
+    timeline?: TimelineItem[];
+    connectingIds?: string[];
+    typingNames?: string[];
+  } = {},
 ) {
   const onLeave = vi.fn();
   const view = render(
@@ -36,8 +41,10 @@ function renderPanel(
       connectingIds={overrides.connectingIds ?? []}
       timeline={overrides.timeline ?? []}
       readiness="open"
+      typingNames={overrides.typingNames ?? []}
       localParticipantId="p-me"
       onSend={() => true}
+      onTyping={() => undefined}
       onEdit={() => true}
       onDelete={() => true}
       onLeave={onLeave}
@@ -153,8 +160,10 @@ describe('unread count', () => {
         connectingIds={[]}
         timeline={[messageItem('m-1', 'one'), messageItem('m-2', 'two')]}
         readiness="open"
+        typingNames={[]}
         localParticipantId="p-me"
         onSend={() => true}
+        onTyping={() => undefined}
         onEdit={() => true}
         onDelete={() => true}
         onLeave={() => undefined}
@@ -168,16 +177,49 @@ describe('unread count', () => {
   });
 });
 
+describe('typing indicator', () => {
+  const typingLine = () => screen.getByRole('status', { name: 'Typing status' });
+
+  test('nobody typing leaves the line empty, so nothing is announced', () => {
+    renderPanel();
+
+    expect(typingLine()).toHaveTextContent('');
+  });
+
+  test('one person is named, by first name like the messages beside it', () => {
+    renderPanel({ typingNames: ['Bea Nolan'] });
+
+    expect(typingLine()).toHaveTextContent('Bea is typing…');
+    expect(typingLine()).not.toHaveTextContent('Nolan');
+  });
+
+  test('two people are both named', () => {
+    renderPanel({ typingNames: ['Bea Nolan', 'Cal Reed'] });
+
+    expect(typingLine()).toHaveTextContent('Bea and Cal are typing…');
+  });
+
+  test('more than two are summarised rather than listed', () => {
+    renderPanel({ typingNames: ['Bea Nolan', 'Cal Reed', 'Dee Shah'] });
+
+    expect(typingLine()).toHaveTextContent('Several people are typing…');
+  });
+});
+
 describe('connection announcements', () => {
   test('a reconnect is announced, not only shown', () => {
     renderPanel({ status: 'reconnecting' });
 
-    expect(screen.getByRole('status')).toHaveTextContent('Reconnecting to the chat server');
+    expect(screen.getByRole('status', { name: 'Connection status' })).toHaveTextContent(
+      'Reconnecting to the chat server',
+    );
   });
 
   test('a healthy session announces that sending is possible', () => {
     renderPanel();
 
-    expect(screen.getByRole('status')).toHaveTextContent('Connected. You can send messages.');
+    expect(screen.getByRole('status', { name: 'Connection status' })).toHaveTextContent(
+      'Connected. You can send messages.',
+    );
   });
 });

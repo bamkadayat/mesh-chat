@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Participant } from '../../../../../../shared/signalingEvents';
 import type { ComposerReadiness, SessionStatus, TimelineItem } from '../../model/types';
 import { connectionAnnouncement } from './connectionAnnouncement';
+import { firstName } from './messages/firstName';
 import { MessageComposer } from './composer/MessageComposer';
 import { MessageList } from './messages/MessageList';
 import { ParticipantList } from './participants/ParticipantList';
@@ -15,12 +16,33 @@ type ChatPanelProps = {
   connectingIds: string[];
   timeline: TimelineItem[];
   readiness: ComposerReadiness;
+  typingNames: string[];
   localParticipantId: string;
   onSend: (text: string) => boolean;
+  onTyping: (isTyping: boolean) => void;
   onEdit: (messageId: string, text: string) => boolean;
   onDelete: (messageId: string) => boolean;
   onLeave: () => void;
 };
+
+/**
+ * Empty while nobody is typing, so the live region stays quiet. First names, to
+ * match the messages beside it rather than the participant list.
+ */
+function typingLine(displayNames: string[]): string {
+  const names = displayNames.map(firstName);
+
+  if (names.length === 0) {
+    return '';
+  }
+  if (names.length === 1) {
+    return `${String(names[0])} is typing…`;
+  }
+  if (names.length === 2) {
+    return `${String(names[0])} and ${String(names[1])} are typing…`;
+  }
+  return 'Several people are typing…';
+}
 
 export function ChatPanel({
   status,
@@ -28,8 +50,10 @@ export function ChatPanel({
   connectingIds,
   timeline,
   readiness,
+  typingNames,
   localParticipantId,
   onSend,
+  onTyping,
   onEdit,
   onDelete,
   onLeave,
@@ -73,7 +97,7 @@ export function ChatPanel({
 
         {/* One region that stays mounted, so a screen reader reads each change
             instead of only what happens to be present when it first appears. */}
-        <p className="visually-hidden" role="status">
+        <p className="visually-hidden" role="status" aria-label="Connection status">
           {connectionAnnouncement(status, readiness)}
         </p>
 
@@ -102,7 +126,10 @@ export function ChatPanel({
             onEdit={onEdit}
             onDelete={onDelete}
           />
-          <MessageComposer readiness={readiness} onSend={onSend} />
+          <p className={styles.typing} role="status" aria-label="Typing status">
+            {typingLine(typingNames)}
+          </p>
+          <MessageComposer readiness={readiness} onSend={onSend} onTyping={onTyping} />
         </div>
       </div>
     </section>

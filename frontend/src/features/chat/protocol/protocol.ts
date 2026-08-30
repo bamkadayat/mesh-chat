@@ -32,8 +32,28 @@ export type MessageDeleteEvent = {
 
 export type ChatEvent = MessageCreateEvent | MessageUpdateEvent | MessageDeleteEvent;
 
+/**
+ * Not a chat event: it changes no message and never reaches the reducer or the
+ * timeline. It is carried on the same channel because it is peer state, and the
+ * server has no business seeing who is typing either.
+ */
+export type TypingEvent = {
+  type: 'typing:changed';
+  payload: {
+    participantId: string;
+    isTyping: boolean;
+  };
+};
+
+/** Everything a peer may send over the data channel. */
+export type PeerEvent = ChatEvent | TypingEvent;
+
 /** Turns an event into the string sent over the data channel. */
 export function serializeChatEvent(event: ChatEvent): string {
+  return JSON.stringify(event);
+}
+
+export function serializeTypingEvent(event: TypingEvent): string {
   return JSON.stringify(event);
 }
 
@@ -41,7 +61,7 @@ export function serializeChatEvent(event: ChatEvent): string {
  * A peer can send anything, so this returns null instead of throwing.
  * A bad frame is dropped and the app carries on.
  */
-export function parseChatEvent(raw: string): ChatEvent | null {
+export function parsePeerEvent(raw: string): PeerEvent | null {
   const value = parseJson(raw);
 
   if (!isRecord(value) || !isRecord(value.payload)) {
@@ -55,9 +75,17 @@ export function parseChatEvent(raw: string): ChatEvent | null {
       return readUpdate(value.payload);
     case 'message:delete':
       return readDelete(value.payload);
+    case 'typing:changed':
+      return readTyping(value.payload);
     default:
       return null;
   }
+}
+
+/** The chat subset, for callers that must not be handed peer state. */
+export function parseChatEvent(raw: string): ChatEvent | null {
+  const event = parsePeerEvent(raw);
+  return event === null || event.type === 'typing:changed' ? null : event;
 }
 
 /** Malformed JSON is expected from an untrusted peer, so it is a null, not a throw. */
@@ -99,6 +127,16 @@ function readTimestamp(value: unknown): string | null {
     return null;
   }
   return Number.isNaN(Date.parse(value)) ? null : value;
+}
+
+function readTyping(payload: Record<string, unknown>): TypingEvent | null {
+  const participantId = readId(payload.participantId);
+
+  if (participantId === null || typeof payload.isTyping !== 'boolean') {
+    return null;
+  }
+
+  return { type: 'typing:changed', payload: { participantId, isTyping: payload.isTyping } };
 }
 
 function readCreate(payload: Record<string, unknown>): MessageCreateEvent | null {

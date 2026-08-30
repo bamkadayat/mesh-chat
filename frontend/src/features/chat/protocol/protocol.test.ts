@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { parseChatEvent, serializeChatEvent, type ChatEvent } from './protocol';
+import { describe, expect, it, test } from 'vitest';
+import {
+  parseChatEvent,
+  parsePeerEvent,
+  serializeChatEvent,
+  serializeTypingEvent,
+  type ChatEvent,
+} from './protocol';
 import { MAX_MESSAGE_LENGTH } from '../model/constants';
 
 const created: ChatEvent = {
@@ -141,5 +147,45 @@ describe('parseChatEvent normalises text', () => {
   it('trims surrounding whitespace', () => {
     const parsed = parseChatEvent(createWith({ text: '  hello  ' }));
     expect(parsed?.type === 'message:create' && parsed.payload.text).toBe('hello');
+  });
+});
+
+describe('typing events', () => {
+  test('a valid typing event round-trips', () => {
+    const raw = serializeTypingEvent({
+      type: 'typing:changed',
+      payload: { participantId: 'p-alex', isTyping: true },
+    });
+
+    expect(parsePeerEvent(raw)).toEqual({
+      type: 'typing:changed',
+      payload: { participantId: 'p-alex', isTyping: true },
+    });
+  });
+
+  test('isTyping must be a boolean, not a truthy value', () => {
+    for (const isTyping of ['true', 1, null, undefined]) {
+      const raw = JSON.stringify({
+        type: 'typing:changed',
+        payload: { participantId: 'p-alex', isTyping },
+      });
+      expect(parsePeerEvent(raw)).toBeNull();
+    }
+  });
+
+  test('a typing event without a participant is rejected', () => {
+    const raw = JSON.stringify({ type: 'typing:changed', payload: { isTyping: true } });
+
+    expect(parsePeerEvent(raw)).toBeNull();
+  });
+
+  test('parseChatEvent never returns a typing event', () => {
+    const raw = serializeTypingEvent({
+      type: 'typing:changed',
+      payload: { participantId: 'p-alex', isTyping: true },
+    });
+
+    expect(parsePeerEvent(raw)).not.toBeNull();
+    expect(parseChatEvent(raw)).toBeNull();
   });
 });

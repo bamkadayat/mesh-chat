@@ -1,4 +1,5 @@
 .composer {
+  position: relative;
   margin: 0 1.5rem 1.25rem;
 }
 
@@ -59,17 +60,28 @@
   margin-left: auto;
 }
 
-/* Attach and emoji are placeholders the mockup shows but nothing implements.
-   Dimmed just enough to read as unavailable beside the send arrow, without
-   fading out of the composer the mockup draws. */
+/* Attach is the only placeholder left. The mockup draws it, nothing implements
+   it, so it is dimmed to read as unavailable beside the controls that work. */
 .action:disabled {
   cursor: not-allowed;
   opacity: 0.7;
 }
 
-/* Send is the one control that becomes usable. The mockup only draws the
-   resting state, which is the same muted grey as the placeholders, so the
-   active colour is the accent every other live control in the panel uses. */
+/* Accent means the control can act right now: emoji always can, send only once
+   there is text, attach never. Without it the working emoji button looked
+   exactly like the placeholder beside it. */
+.action:enabled {
+  color: var(--color-accent);
+}
+
+/* Held while the picker is showing, which is the visible half of aria-expanded. */
+.action:hover:enabled,
+.action[aria-expanded='true'] {
+  background: var(--color-track);
+}
+
+/* The same rule as above. The mockup only draws the resting composer, so it
+   specifies no colour for a send that can act. */
 .send:enabled {
   color: var(--color-accent);
 }

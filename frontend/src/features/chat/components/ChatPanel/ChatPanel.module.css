@@ -69,3 +69,12 @@
 .content[hidden] {
   display: none;
 }
+
+/* Reserves its line so the message list does not jump when someone types. */
+.typing {
+  min-height: 1.25rem;
+  margin: 0;
+  padding: 0 1.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}

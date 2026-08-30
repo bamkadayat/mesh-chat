@@ -40,8 +40,10 @@ export function ChatFeature() {
       connectingIds={session.connectingIds}
       timeline={session.timeline}
       readiness={session.readiness}
+      typingNames={session.typingNames}
       localParticipantId={session.localParticipantId}
       onSend={session.sendMessage}
+      onTyping={session.setTyping}
       onEdit={session.editMessage}
       onDelete={session.deleteMessage}
       onLeave={session.leave}
