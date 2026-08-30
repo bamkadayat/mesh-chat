@@ -6,7 +6,7 @@
   flex-direction: column;
   border-radius: var(--radius-panel);
   background: var(--color-panel);
-  box-shadow: 0 2px 12px rgb(0 0 0 / 12%);
+  box-shadow: var(--shadow-panel);
 }
 
 .header {
@@ -52,7 +52,7 @@
   margin: 0;
   padding: 0.5rem 1.5rem 0;
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-small);
 }
 
 .statusError {
@@ -76,5 +76,12 @@
   margin: 0;
   padding: 0 1.5rem;
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-small);
+}
+
+/* Remove panel corners when it fills the small-screen viewport. */
+@media (max-width: 40rem) {
+  .panel {
+    border-radius: 0;
+  }
 }

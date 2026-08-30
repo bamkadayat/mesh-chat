@@ -33,7 +33,7 @@
 
 .time {
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-small);
   font-variant-numeric: tabular-nums;
 }
 
@@ -59,11 +59,11 @@
 
 .edited {
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-small);
 }
 
 .own .edited {
-  color: rgb(255 255 255 / 75%);
+  color: var(--color-on-accent-soft);
 }
 
 .link {
@@ -109,7 +109,7 @@
   border: 0;
   background: none;
   color: var(--color-text-muted);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-small);
 }
 
 .action:hover {
@@ -144,7 +144,7 @@
   padding: 0.375rem 0.875rem;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-small);
   font-weight: 600;
 }
 

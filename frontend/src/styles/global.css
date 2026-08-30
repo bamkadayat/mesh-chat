@@ -10,6 +10,12 @@
   --color-input: #f0f2f5;
   --color-danger: #b3261e;
   --color-bubble-peer: #f1f3f4;
+  /* White at reduced strength, for text sitting on the accent colour. */
+  --color-on-accent-soft: rgb(255 255 255 / 75%);
+
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 12%);
+  --shadow-panel: 0 2px 12px rgb(0 0 0 / 12%);
+  --shadow-popover: 0 4px 16px rgb(0 0 0 / 14%);
 
   --radius-control: 0.5rem;
   --radius-bubble: 0.875rem;
@@ -30,6 +36,8 @@
   );
 
   --join-fit: min(26.25rem, calc(100% - 2rem));
+
+  --font-size-small: 0.8125rem;
 
   --font-body:
     system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
@@ -115,6 +123,5 @@ button:disabled {
     --page-padding: 0;
     --panel-fit: 100%;
     --panel-height: 100dvh;
-    --radius-panel: 0;
   }
 }

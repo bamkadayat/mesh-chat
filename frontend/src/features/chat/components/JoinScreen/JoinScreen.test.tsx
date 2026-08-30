@@ -81,7 +81,7 @@ describe('JoinScreen', () => {
 
     await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter a display name to join.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter your first and last name.');
   });
 
   it('ties the validation message to the input for screen readers', async () => {
@@ -91,7 +91,7 @@ describe('JoinScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
     expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(input).toHaveAccessibleDescription('Enter a display name to join.');
+    expect(input).toHaveAccessibleDescription('Enter your first and last name.');
   });
 
   it('caps the name at the documented maximum length', () => {

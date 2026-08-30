@@ -17,7 +17,7 @@ function validateDisplayName(value: string): { name: string; error: string | nul
   const name = value.trim().replace(/\s+/g, ' ');
 
   if (name === '') {
-    return { name, error: 'Enter a display name to join.' };
+    return { name, error: 'Enter your first and last name.' };
   }
   if (!name.includes(' ')) {
     return { name, error: 'Enter your first and last name, so others can tell you apart.' };

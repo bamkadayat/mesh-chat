@@ -110,6 +110,33 @@ describe('panels', () => {
 });
 
 describe('presence', () => {
+  test('you are marked in the list, and nobody else is', async () => {
+    const { user } = renderPanel();
+    await user.click(tab(/Participants/));
+
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('Alex Fisher (You)');
+    expect(rows[1]).toHaveTextContent('Bea Fisher');
+    expect(rows[1]).not.toHaveTextContent('(You)');
+  });
+
+  test('each participant carries their initials', async () => {
+    const { user } = renderPanel();
+    await user.click(tab(/Participants/));
+
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0]).toHaveTextContent('AF');
+    expect(rows[1]).toHaveTextContent('BF');
+  });
+
+  test('the initials are hidden from assistive technology, being a repeat of the name', async () => {
+    const { user } = renderPanel();
+    await user.click(tab(/Participants/));
+
+    const panel = screen.getByRole('tabpanel');
+    expect(within(panel).getByText('AF')).toHaveAttribute('aria-hidden', 'true');
+  });
+
   test('a participant whose channel is still opening is marked, and only that one', async () => {
     const { user } = renderPanel({ connectingIds: ['p-bea'] });
     await user.click(tab(/Participants/));

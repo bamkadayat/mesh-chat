@@ -77,10 +77,16 @@ export function ChatPanel({
     setSeenCount(messageCount);
   }
 
+  /**
+   * main, not section: this is the page content once you have joined. The label
+   * points at the heading instead of repeating the title as a second string.
+   */
   return (
-    <section className={styles.panel} aria-label="Status meeting standup">
+    <main className={styles.panel} aria-labelledby="chat-title">
       <header className={styles.header}>
-        <h1 className={styles.title}>Status meeting standup</h1>
+        <h1 id="chat-title" className={styles.title}>
+          Status meeting standup
+        </h1>
         <button type="button" className={styles.close} onClick={onLeave} aria-label="Leave session">
           ✕
         </button>
@@ -109,7 +115,11 @@ export function ChatPanel({
           hidden={tabs.tab !== 'participants'}
           tabIndex={0}
         >
-          <ParticipantList participants={participants} connectingIds={connectingIds} />
+          <ParticipantList
+            participants={participants}
+            connectingIds={connectingIds}
+            localParticipantId={localParticipantId}
+          />
         </div>
 
         <div
@@ -132,6 +142,6 @@ export function ChatPanel({
           <MessageComposer readiness={readiness} onSend={onSend} onTyping={onTyping} />
         </div>
       </div>
-    </section>
+    </main>
   );
 }
