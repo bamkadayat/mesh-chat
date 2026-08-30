@@ -59,6 +59,17 @@ export function useChatSession(signalingUrl: string): ChatSession {
   const sessionRef = useRef<ActiveSession | null>(null);
   /** Peer IDs the mesh currently holds, so a rejoin can rebuild every one. */
   const meshPeerIds = useRef<Set<string>>(new Set());
+  /**
+   * The roster, mirrored outside React state. Signaling handlers need to read it
+   * and announce a change in the same breath, and React may run a state updater
+   * more than once, so that work must not happen inside one.
+   */
+  const participantsRef = useRef<Participant[]>([]);
+
+  const writeParticipants = useCallback((next: Participant[]): void => {
+    participantsRef.current = next;
+    setParticipants(next);
+  }, []);
   const [localParticipantId, setLocalParticipantId] = useState('');
 
   const addSystemEvent = useCallback((event: Omit<SystemEvent, 'eventId'>): void => {
@@ -143,12 +154,15 @@ export function useChatSession(signalingUrl: string): ChatSession {
           void mesh.handleIceCandidate(fromParticipantId, candidate);
         }),
         signaling.onParticipantJoined((participant) => {
-          meshPeerIds.current.add(participant.participantId);
-          setParticipants((current) =>
-            current.some((entry) => entry.participantId === participant.participantId)
-              ? current
-              : [...current, participant],
+          const known = participantsRef.current.some(
+            (entry) => entry.participantId === participant.participantId,
           );
+          if (known) {
+            return;
+          }
+
+          meshPeerIds.current.add(participant.participantId);
+          writeParticipants([...participantsRef.current, participant]);
           addSystemEvent({
             type: 'participant-joined',
             displayName: participant.displayName,
@@ -156,17 +170,19 @@ export function useChatSession(signalingUrl: string): ChatSession {
           });
         }),
         signaling.onParticipantLeft((participantId) => {
-          setParticipants((current) => {
-            const leaving = current.find((entry) => entry.participantId === participantId);
-            if (leaving !== undefined) {
-              addSystemEvent({
-                type: 'participant-left',
-                displayName: leaving.displayName,
-                occurredAt: new Date().toISOString(),
-              });
-            }
-            return current.filter((entry) => entry.participantId !== participantId);
-          });
+          const leaving = participantsRef.current.find(
+            (entry) => entry.participantId === participantId,
+          );
+          if (leaving !== undefined) {
+            writeParticipants(
+              participantsRef.current.filter((entry) => entry.participantId !== participantId),
+            );
+            addSystemEvent({
+              type: 'participant-left',
+              displayName: leaving.displayName,
+              occurredAt: new Date().toISOString(),
+            });
+          }
           setChannelStates((current) => {
             const next = { ...current };
             delete next[participantId];
@@ -192,7 +208,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
           }
           meshPeerIds.current.clear();
           setChannelStates({});
-          setParticipants([identity, ...outcome.participants]);
+          writeParticipants([identity, ...outcome.participants]);
 
           /**
            * The same rule as a first join: the roster only lists participants
@@ -228,7 +244,7 @@ export function useChatSession(signalingUrl: string): ChatSession {
         return;
       }
 
-      setParticipants([identity, ...outcome.participants]);
+      writeParticipants([identity, ...outcome.participants]);
       setStatus('connected');
 
       /** Only the newcomer offers, which is what keeps two offers from crossing. */
@@ -237,16 +253,16 @@ export function useChatSession(signalingUrl: string): ChatSession {
         void mesh.connectToPeer(existing.participantId);
       }
     },
-    [addSystemEvent, closeSession, signalingUrl],
+    [addSystemEvent, closeSession, signalingUrl, writeParticipants],
   );
 
   const leave = useCallback((): void => {
     closeSession();
     setStatus('idle');
     setErrorReason(null);
-    setParticipants([]);
+    writeParticipants([]);
     setChannelStates({});
-  }, [closeSession]);
+  }, [closeSession, writeParticipants]);
 
   /**
    * Sending and receiving take the same path: serialize, parse, dispatch. Local
