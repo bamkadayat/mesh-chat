@@ -49,6 +49,23 @@ describe('ownership', () => {
   });
 });
 
+describe('telling your own messages apart', () => {
+  test('your own message is labelled You, not your name', () => {
+    renderItem({ authorName: 'Alex Fisher' }, true);
+
+    expect(screen.getByText('You')).toBeInTheDocument();
+    expect(screen.queryByText('Alex')).toBeNull();
+  });
+
+  test('another participant is named by their first name', () => {
+    renderItem({ authorName: 'Bea Fisher' }, false);
+
+    expect(screen.getByText('Bea')).toBeInTheDocument();
+    expect(screen.queryByText('You')).toBeNull();
+    expect(screen.queryByText('Bea Fisher')).toBeNull();
+  });
+});
+
 describe('rendering', () => {
   test('an edited message keeps its text and gains the edited label', () => {
     renderItem({ text: 'the new text', editedAt: '2026-08-30T09:16:00.000Z' });

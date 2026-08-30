@@ -92,9 +92,9 @@ export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemPro
   }
 
   return (
-    <li className={styles.item}>
+    <li className={isOwn ? `${styles.item} ${styles.own}` : styles.item}>
       <p className={styles.header}>
-        <span className={styles.author}>{firstName(message.authorName)}</span>
+        <span className={styles.author}>{isOwn ? 'You' : firstName(message.authorName)}</span>
         <time className={styles.time} dateTime={message.createdAt}>
           {formatTime(message.createdAt)}
         </time>
