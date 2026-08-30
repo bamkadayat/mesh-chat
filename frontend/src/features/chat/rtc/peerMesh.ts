@@ -54,13 +54,26 @@ export function createPeerMesh(callbacks: PeerMeshCallbacks): PeerMesh {
     return !closed && peers.get(peerId) === peer;
   }
 
-  function ensurePeer(peerId: string): Peer {
+  /**
+   * Returns null when the connection cannot be constructed, which happens in a
+   * browser with WebRTC disabled. Reporting it here keeps the failure inside the
+   * state machine instead of escaping as an unhandled rejection.
+   */
+  function ensurePeer(peerId: string): Peer | null {
     const existing = peers.get(peerId);
     if (existing !== undefined) {
       return existing;
     }
 
-    const connection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    let connection: RTCPeerConnection;
+    try {
+      connection = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    } catch (error) {
+      console.error(`peer ${peerId} could not be created`, error);
+      callbacks.onChannelStateChange(peerId, 'failed');
+      return null;
+    }
+
     const peer: Peer = { connection, channel: null, pendingCandidates: [] };
     peers.set(peerId, peer);
 
@@ -151,6 +164,10 @@ export function createPeerMesh(callbacks: PeerMeshCallbacks): PeerMesh {
       }
 
       const peer = ensurePeer(peerId);
+      if (peer === null) {
+        return;
+      }
+
       try {
         if (peer.channel === null) {
           attachChannel(peerId, peer, peer.connection.createDataChannel(CHAT_CHANNEL_LABEL));
@@ -173,6 +190,10 @@ export function createPeerMesh(callbacks: PeerMeshCallbacks): PeerMesh {
       }
 
       const peer = ensurePeer(peerId);
+      if (peer === null) {
+        return;
+      }
+
       try {
         await peer.connection.setRemoteDescription(description);
         await applyPendingCandidates(peer);
@@ -213,6 +234,10 @@ export function createPeerMesh(callbacks: PeerMeshCallbacks): PeerMesh {
       }
 
       const peer = ensurePeer(peerId);
+      if (peer === null) {
+        return;
+      }
+
       if (peer.connection.remoteDescription === null) {
         peer.pendingCandidates.push(candidate);
         return;
