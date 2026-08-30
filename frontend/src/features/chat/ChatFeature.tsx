@@ -48,7 +48,10 @@ export function ChatFeature() {
       connectingIds={connectingIds}
       timeline={session.timeline}
       readiness={session.readiness}
+      localParticipantId={session.localParticipantId}
       onSend={session.sendMessage}
+      onEdit={session.editMessage}
+      onDelete={session.deleteMessage}
       onLeave={session.leave}
     />
   );

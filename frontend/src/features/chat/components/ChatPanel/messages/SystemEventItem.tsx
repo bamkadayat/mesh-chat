@@ -1,4 +1,4 @@
-import type { SystemEvent } from '../../model/types';
+import type { SystemEvent } from '../../../model/types';
 import { formatTime } from './formatTime';
 import styles from './SystemEventItem.module.css';
 

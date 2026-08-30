@@ -1,13 +1,12 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useState } from 'react';
 import type { Participant } from '../../../../../../shared/signalingEvents';
 import type { ComposerReadiness, SessionStatus, TimelineItem } from '../../model/types';
-import { MessageComposer } from './MessageComposer';
-import { MessageList } from './MessageList';
-import { ParticipantList } from './ParticipantList';
+import { MessageComposer } from './composer/MessageComposer';
+import { MessageList } from './messages/MessageList';
+import { ParticipantList } from './participants/ParticipantList';
+import { ChatTabs } from './tabs/ChatTabs';
+import { useChatPanelTabs } from './tabs/useChatPanelTabs';
 import styles from './ChatPanel.module.css';
-
-type Tab = 'participants' | 'chat';
-const TABS: Tab[] = ['participants', 'chat'];
 
 type ChatPanelProps = {
   status: SessionStatus;
@@ -15,7 +14,10 @@ type ChatPanelProps = {
   connectingIds: string[];
   timeline: TimelineItem[];
   readiness: ComposerReadiness;
+  localParticipantId: string;
   onSend: (text: string) => boolean;
+  onEdit: (messageId: string, text: string) => boolean;
+  onDelete: (messageId: string) => boolean;
   onLeave: () => void;
 };
 
@@ -25,15 +27,14 @@ export function ChatPanel({
   connectingIds,
   timeline,
   readiness,
+  localParticipantId,
   onSend,
+  onEdit,
+  onDelete,
   onLeave,
 }: ChatPanelProps) {
-  const [tab, setTab] = useState<Tab>('chat');
+  const tabs = useChatPanelTabs();
   const [seenCount, setSeenCount] = useState(0);
-  const tabRefs = useRef<Record<Tab, HTMLButtonElement | null>>({
-    participants: null,
-    chat: null,
-  });
 
   const messageCount = timeline.reduce(
     (total, item) => total + (item.kind === 'message' ? 1 : 0),
@@ -44,24 +45,11 @@ export function ChatPanel({
    * Messages that arrived while the participant list was open. Deleted messages
    * stay in the timeline as tombstones, so this count never runs backwards.
    */
-  const unread = tab === 'chat' ? 0 : messageCount - seenCount;
+  const unread = tabs.tab === 'chat' ? 0 : messageCount - seenCount;
 
   /** Reading the chat marks everything in it as seen, including later arrivals. */
-  if (tab === 'chat' && seenCount !== messageCount) {
+  if (tabs.tab === 'chat' && seenCount !== messageCount) {
     setSeenCount(messageCount);
-  }
-
-  /** Arrow keys move between tabs, which is what the tab role promises. */
-  function handleTabKeys(event: KeyboardEvent<HTMLButtonElement>): void {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
-      return;
-    }
-
-    event.preventDefault();
-    const step = event.key === 'ArrowRight' ? 1 : -1;
-    const next = TABS[(TABS.indexOf(tab) + step + TABS.length) % TABS.length] ?? 'chat';
-    setTab(next);
-    tabRefs.current[next]?.focus();
   }
 
   return (
@@ -74,35 +62,7 @@ export function ChatPanel({
       </header>
 
       <div className={styles.body}>
-        <div className={styles.tabs} role="tablist" aria-label="Panel sections">
-          {TABS.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              id={`tab-${name}`}
-              aria-selected={tab === name}
-              aria-controls={`panel-${name}`}
-              tabIndex={tab === name ? 0 : -1}
-              ref={(element) => {
-                tabRefs.current[name] = element;
-              }}
-              className={tab === name ? styles.tabActive : styles.tab}
-              onClick={() => {
-                setTab(name);
-              }}
-              onKeyDown={handleTabKeys}
-            >
-              {name === 'participants' ? `Participants (${participants.length})` : 'Chat'}
-              {name === 'chat' && unread > 0 && (
-                <span className={styles.badge}>
-                  {unread}
-                  <span className="visually-hidden"> unread</span>
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
+        <ChatTabs tabs={tabs} participantCount={participants.length} unread={unread} />
 
         {status === 'reconnecting' && (
           <p className={`${styles.status} ${styles.statusError}`} role="status">
@@ -115,7 +75,7 @@ export function ChatPanel({
           role="tabpanel"
           id="panel-participants"
           aria-labelledby="tab-participants"
-          hidden={tab !== 'participants'}
+          hidden={tabs.tab !== 'participants'}
           tabIndex={0}
         >
           <ParticipantList participants={participants} connectingIds={connectingIds} />
@@ -126,10 +86,15 @@ export function ChatPanel({
           role="tabpanel"
           id="panel-chat"
           aria-labelledby="tab-chat"
-          hidden={tab !== 'chat'}
+          hidden={tabs.tab !== 'chat'}
           tabIndex={0}
         >
-          <MessageList timeline={timeline} />
+          <MessageList
+            timeline={timeline}
+            localParticipantId={localParticipantId}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
           <MessageComposer readiness={readiness} onSend={onSend} />
         </div>
       </div>

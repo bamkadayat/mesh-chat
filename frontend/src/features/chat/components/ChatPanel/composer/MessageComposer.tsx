@@ -1,6 +1,6 @@
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type SubmitEvent } from 'react';
-import { MAX_MESSAGE_LENGTH } from '../../model/constants';
-import type { ComposerReadiness } from '../../model/types';
+import { MAX_MESSAGE_LENGTH } from '../../../model/constants';
+import type { ComposerReadiness } from '../../../model/types';
 import styles from './MessageComposer.module.css';
 
 type MessageComposerProps = {

@@ -1,4 +1,4 @@
-import type { Participant } from '../../../../../../shared/signalingEvents';
+import type { Participant } from '../../../../../../../shared/signalingEvents';
 import styles from './ParticipantList.module.css';
 
 type ParticipantListProps = {
