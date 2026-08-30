@@ -36,6 +36,15 @@ function MessageText({ text }: { text: string }) {
   );
 }
 
+/**
+ * A screen reader can list the buttons on their own, where four of them reading
+ * "Edit, Delete, Edit, Delete" say nothing about which message they act on.
+ */
+function actionLabel(action: string, text: string): string {
+  const preview = text.replace(/\s+/g, ' ').trim();
+  return `${action} message: ${preview.length > 40 ? `${preview.slice(0, 40)}…` : preview}`;
+}
+
 export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const editButtonRef = useRef<HTMLButtonElement>(null);
@@ -151,6 +160,7 @@ export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemPro
             type="button"
             ref={editButtonRef}
             className={styles.action}
+            aria-label={actionLabel('Edit', message.text)}
             onClick={() => {
               setDraft(message.text);
             }}
@@ -160,6 +170,7 @@ export function MessageItem({ message, isOwn, onEdit, onDelete }: MessageItemPro
           <button
             type="button"
             className={styles.action}
+            aria-label={actionLabel('Delete', message.text)}
             onClick={() => {
               onDelete(message.messageId);
             }}

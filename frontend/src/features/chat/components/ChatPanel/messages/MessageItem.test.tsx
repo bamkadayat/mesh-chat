@@ -30,22 +30,22 @@ describe('ownership', () => {
   test('the author gets edit and delete controls', () => {
     renderItem();
 
-    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Edit/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Delete/ })).toBeInTheDocument();
   });
 
   test('another participant gets no controls', () => {
     renderItem({}, false);
 
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull();
   });
 
   test('a deleted message offers nothing to act on, even to its author', () => {
     renderItem({ deletedAt: '2026-08-30T09:16:00.000Z' });
 
-    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Delete' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull();
   });
 });
 
@@ -63,6 +63,61 @@ describe('telling your own messages apart', () => {
     expect(screen.getByText('Bea')).toBeInTheDocument();
     expect(screen.queryByText('You')).toBeNull();
     expect(screen.queryByText('Bea Fisher')).toBeNull();
+  });
+});
+
+describe('accessible names', () => {
+  test('each action names the message it acts on, not just the verb', () => {
+    renderItem({ text: 'ship it before lunch' });
+
+    expect(
+      screen.getByRole('button', { name: 'Edit message: ship it before lunch' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete message: ship it before lunch' }),
+    ).toBeInTheDocument();
+  });
+
+  test('two messages give two distinct button names', () => {
+    render(
+      <>
+        <MessageItem message={message({ text: 'first' })} isOwn onEdit={() => true} onDelete={() => true} />
+        <MessageItem
+          message={message({ messageId: 'm-2', text: 'second' })}
+          isOwn
+          onEdit={() => true}
+          onDelete={() => true}
+        />
+      </>,
+    );
+
+    const names = screen.getAllByRole('button').map((button) => button.getAttribute('aria-label'));
+    expect(new Set(names).size).toBe(names.length);
+    expect(names).toContain('Edit message: first');
+    expect(names).toContain('Edit message: second');
+  });
+
+  test('a long message is truncated rather than read out in full', () => {
+    renderItem({ text: 'a'.repeat(120) });
+
+    const label = screen
+      .getByRole('button', { name: /^Edit/ })
+      .getAttribute('aria-label');
+    expect(label).toBe(`Edit message: ${'a'.repeat(40)}…`);
+  });
+
+  test('newlines are collapsed so the name stays on one line', () => {
+    renderItem({ text: 'line one\n\nline two' });
+
+    expect(
+      screen.getByRole('button', { name: 'Edit message: line one line two' }),
+    ).toBeInTheDocument();
+  });
+
+  test('the visible text stays short', () => {
+    renderItem({ text: 'ship it' });
+
+    expect(screen.getByRole('button', { name: /^Edit/ })).toHaveTextContent('Edit');
   });
 });
 
@@ -92,7 +147,7 @@ describe('editing', () => {
   test('saving sends the trimmed text and closes the field', async () => {
     const { onEdit, user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: /^Edit/ }));
     await user.clear(screen.getByLabelText('Edit message'));
     await user.type(screen.getByLabelText('Edit message'), '  changed  ');
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -104,7 +159,7 @@ describe('editing', () => {
   test('the caret opens after the existing text, so typing appends', async () => {
     const { user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: /^Edit/ }));
     const field = screen.getByLabelText<HTMLTextAreaElement>('Edit message');
     expect(field).toHaveFocus();
     expect(field.selectionStart).toBe('the original text'.length);
@@ -116,10 +171,10 @@ describe('editing', () => {
   test('closing the editor returns focus to the control that opened it', async () => {
     const { user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: /^Edit/ }));
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect(screen.getByRole('button', { name: 'Edit' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Edit/ })).toHaveFocus();
   });
 
   test('a rejected edit keeps the field open so the text is not lost', async () => {
@@ -129,7 +184,7 @@ describe('editing', () => {
     );
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: /^Edit/ }));
     await user.type(screen.getByLabelText('Edit message'), '!');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -140,7 +195,7 @@ describe('editing', () => {
   test('an emptied field is never saved', async () => {
     const { onEdit, user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: /^Edit/ }));
     await user.clear(screen.getByLabelText('Edit message'));
     await user.type(screen.getByLabelText('Edit message'), '   ');
     await user.click(screen.getByRole('button', { name: 'Save' }));
@@ -151,7 +206,7 @@ describe('editing', () => {
   test('cancelling restores the original text and sends nothing', async () => {
     const { onEdit, user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: /^Edit/ }));
     await user.type(screen.getByLabelText('Edit message'), ' and more');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
@@ -162,7 +217,7 @@ describe('editing', () => {
   test('Escape abandons the edit', async () => {
     const { onEdit, user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.click(screen.getByRole('button', { name: /^Edit/ }));
     await user.type(screen.getByLabelText('Edit message'), '{Escape}');
 
     expect(onEdit).not.toHaveBeenCalled();
@@ -174,7 +229,7 @@ describe('deleting', () => {
   test('delete reports the message id', async () => {
     const { onDelete, user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    await user.click(screen.getByRole('button', { name: /^Delete/ }));
 
     expect(onDelete).toHaveBeenCalledWith('m-1');
   });
