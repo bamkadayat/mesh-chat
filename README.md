@@ -4,6 +4,8 @@ Real-time peer-to-peer chat for small groups. Messages travel directly between
 browsers over WebRTC DataChannels. A small Socket.IO server handles signaling
 and presence only.
 
+![Three browsers side by side, Chrome, Safari and Firefox, with three participants exchanging messages and emoji, an edit appearing in all three windows, and one participant leaving and rejoining](docs/mesh-chat-demo.gif)
+
 ## Getting Started
 
 Requires Node.js 22+, pnpm 9+, and a modern browser with WebRTC support.
@@ -27,10 +29,9 @@ pnpm check
 
 ## Tests
 
-The project has unit tests for the frontend, server, chat protocol, and chat
-state reducer. It also has a Playwright end-to-end test that opens two real
-browser participants and checks the full chat flow: join, connect, send, edit,
-delete, and leave.
+The project has unit tests for the frontend and the server. It also has a
+Playwright end-to-end test that opens two real browser participants and checks
+the full chat flow: join, connect, send, edit, delete, and leave.
 
 ```bash
 pnpm test
@@ -38,6 +39,20 @@ pnpm test:frontend
 pnpm test:server
 pnpm test:e2e
 ```
+
+There are 173 unit tests and one end-to-end test.
+
+The tests focus on the parts that are easy to check in isolation: the protocol,
+reducer, link handling, and ID generation. Component tests cover visible user
+behaviour, such as edit controls, rejected sends, and disabled composer states.
+
+WebRTC is never mocked. A fake `RTCPeerConnection` would only prove that the fake
+behaves as written, so peer negotiation is covered by Playwright with two real
+browser contexts, and by manual checks in two and three windows.
+
+Frontend and server have separate Vitest configurations. The frontend needs a
+DOM and the server must run under Node, and a shared config would hide that
+difference.
 
 ## Configuration
 
@@ -83,6 +98,39 @@ webrtc:ice-candidate   to the one participant it is addressed to
 
 Before forwarding anything, the server checks that the sender is the participant
 the payload claims to be, and that both participants are in the same room.
+
+How a participant joins and starts chatting:
+
+```mermaid
+sequenceDiagram
+    participant A as Browser A, newcomer
+    participant S as Signaling server
+    participant B as Browser B, already here
+
+    A->>S: room:join
+    S-->>A: join acknowledgement + current roster
+    S->>B: participant:joined
+
+    Note over A: only the newcomer offers,<br/>so two offers never cross
+    A->>S: webrtc:offer
+    S->>B: webrtc:offer
+    B->>S: webrtc:answer
+    S->>A: webrtc:answer
+
+    A->>S: webrtc:ice-candidate
+    S->>B: webrtc:ice-candidate
+    B->>S: webrtc:ice-candidate
+    S->>A: webrtc:ice-candidate
+
+    Note over A,B: DataChannel opens, composer becomes usable
+
+    A-->>B: message:create
+    A-->>B: message:update / message:delete
+    Note over S: chat content never reaches the server
+```
+
+ICE candidates may arrive before the corresponding remote description. Early
+candidates are queued and applied once the description is set.
 
 I chose peer-to-peer because the main work in this exercise is real-time browser
 communication. This design keeps the server small and makes the WebRTC flow
@@ -147,7 +195,13 @@ Important rules:
 ```text
 frontend/src/
   app/              application shell
-  features/chat/    chat UI, state, protocol, signaling, and WebRTC
+  features/chat/
+    components/     JoinScreen and ChatPanel
+    hooks/          useChatSession, which owns state and wires the rest together
+    model/          types, reducer, identity, constants
+    protocol/       chat events and linkification
+    rtc/            peerMesh: connections, channels, ICE
+    signaling/      the only place socket.io-client is imported
   lib/              shared frontend utilities
   styles/           global styles
 
@@ -157,42 +211,41 @@ server/src/
   signaling/        Socket.IO handlers and payload validation
 
 shared/             signaling contracts used by frontend and server
+
+e2e/                Playwright end-to-end test
+playwright.config.ts
 ```
 
 ## Edge Cases
 
-### A participant disconnects and reconnects
+### Disconnect and reconnect
 
-Handled. Socket.IO reconnects on its own and the client rejoins the room. The
-roster from that rejoin is authoritative: anyone who left during the outage is
-gone, and anyone who arrived is there.
+Socket.IO reconnects automatically. After reconnecting, the client rejoins the
+room and uses the new roster as the source of truth.
 
-All peer connections are rebuilt after a rejoin. A channel that survived the
-outage looks the same as one that did not, so the client does not try to tell
-them apart.
+All peer connections are rebuilt after a rejoin. This keeps the logic simple
+because the app does not need to decide which old channels survived.
 
-Tested by restarting the signaling server with three participants connected. All
-three channels reopened and all three pairs could send messages again.
+This was tested by restarting the signaling server with three participants
+connected. The channels reopened and all three pairs could send messages again.
 
-Closing a window is the simpler case. The server sees the socket close and sends
+When a browser window closes, the server detects the socket disconnect and sends
 `participant:left` to the room.
 
-### A new participant joins, do they see message history?
+### New participants and message history
 
-No. This is a deliberate limit, not a missing feature. The server stores nothing
-and peers do not send a history snapshot, so a participant sees only the messages
-sent after they join.
+New participants do not receive old messages. This is deliberate: the server
+does not store messages, and peers do not send a history snapshot.
 
-A page refresh has the same effect. You return to the join screen and your own
-timeline is empty. Your participant ID stays in `sessionStorage`, and the other
-windows still hold every message you sent.
+Refreshing the page has the same effect. You rejoin with the same participant
+ID from `sessionStorage`, but your local timeline starts empty.
 
-A database would not be the right fix here, because the server would then have to
-receive message content. The peer-to-peer fix is for an existing peer to send a
-snapshot over the DataChannel. That needs rules for which peer answers and what
-happens when two snapshots disagree, so it is left out.
+A server-side database would change the architecture because the server would
+need to receive message content. In a peer-to-peer version, an existing peer
+could send a snapshot over the DataChannel, but that would need rules for which
+peer sends it and how conflicts are handled.
 
-### How does the UI handle a large volume of messages?
+### Large volumes of messages
 
 Measured with two participants, one of them sending continuously:
 
@@ -214,3 +267,74 @@ and never recovered. Auto-scrolling raises scroll events of its own, and during 
 burst one of those can measure a distance against messages that arrived after it.
 New messages and auto-scrolling never move the view up, so only an upward move now
 stops the follow.
+
+## Bonus Tasks
+
+Four optional tasks are implemented.
+
+**Accessibility.** The app works with the keyboard: join, send, edit, delete,
+switch tabs, and choose an emoji. It also uses labelled buttons, tab semantics,
+live regions for messages and connection status, and accessible names for message
+actions. Colour contrast passes WCAG AA.
+
+**End-to-end tests.** A Playwright test covers the full flow with two real
+browser participants.
+
+**Rich content: emoji picker.** The emoji picker uses a small built-in list. It
+inserts at the caret, replaces selected text, and works with arrow keys, Enter,
+and Escape.
+
+**Real-time: typing indicators.** Typing state is sent over the DataChannel as
+`typing:changed`, so the server still never sees it. It stays outside
+`ChatEvent` because it does not change the message timeline. Timers clear stale
+typing states if a stop event is missed.
+
+Read receipts, message history, virtualization, Docker, link previews, and
+end-to-end encryption are not implemented.
+
+## Trade-offs
+
+- **Full mesh.** Every participant connects to every other participant. This is
+  simple and truly peer-to-peer, but it is only suitable for small rooms.
+- **No global message order.** Each peer connection is ordered, but there is no
+  single server deciding the order across all senders.
+- **No authentication.** Ownership checks stop normal UI misuse, but a modified
+  client could still claim another participant's ID.
+- **No TURN server.** If browsers cannot make a direct WebRTC connection, there
+  is no relay fallback.
+- **No message history.** New participants only see messages sent after they join.
+- **One theme.** The app uses design tokens, but only one visual theme is built.
+
+## Known Issues
+
+- **Refreshing clears your timeline.** You rejoin with the same participant ID,
+  but your local messages are gone. Other open windows still keep their copies.
+- **Message privacy is architectural, not cryptographic.** The server has no chat
+  message handler, and DataChannels are encrypted in transit. This is not full
+  end-to-end encryption because there is no app-level key management.
+- **No real screen reader pass yet.** Keyboard behaviour and ARIA are covered by
+  tests, but the app has not been checked with VoiceOver or NVDA.
+- **The message list is not virtualized.** It keeps one DOM node per message. It
+  was tested up to 2,000 messages, but it will slow down eventually.
+- **Two tabs count as two participants.** Participant IDs live in
+  `sessionStorage`, so the same person in two tabs appears twice with the same
+  name.
+
+## What I'd Improve With More Time
+
+- **Message history.** Add history for new participants, either from a peer
+  snapshot or a small history API.
+- **TURN support.** Add a relay so WebRTC works on stricter networks.
+- **Read receipts.** Track which participants have read each message.
+- **Virtualized message list.** Keep the chat fast with 10,000+ messages.
+- **Screen reader testing.** Run the app with VoiceOver or NVDA and fix anything
+  found.
+
+## Time Spent
+
+About nine hours across two sessions.
+
+Most of the time went into the core chat flow: signaling, WebRTC connection
+handling, message state, and the UI. The rest went into tests, accessibility,
+the emoji picker, typing indicators, and debugging a Firefox-specific connection
+issue.
