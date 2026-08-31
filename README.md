@@ -33,9 +33,9 @@ pnpm test:server
 pnpm test:e2e
 ```
 
-Unit tests cover what is easy to check on its own: the protocol, the reducer
-that updates the message list, link handling and ID generation. Component tests
-cover what a user sees, such as edit controls and a disabled composer.
+Unit tests cover the message reducer, peer-event validation, ownership rules and
+the server's signaling boundaries. Component tests cover the interactions a user
+actually performs: joining, sending, editing and deleting.
 
 WebRTC is never mocked. A fake `RTCPeerConnection` would only prove the fake
 works, so real peer connections are covered by Playwright and by hand in two and

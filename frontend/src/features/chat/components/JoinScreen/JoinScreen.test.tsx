@@ -14,7 +14,7 @@ function renderJoinScreen(overrides: Partial<Parameters<typeof JoinScreen>[0]> =
 describe('JoinScreen', () => {
   /** Cleanup runs after each test, so a case inside a loop has to clear its own render. */
   it('joins with the name, tidied of surrounding and inner spacing', async () => {
-    const names = [
+    const names: [string, string][] = [
       ['Alex Fisher', 'Alex Fisher'],
       ['  Alex Fisher  ', 'Alex Fisher'],
       ['Alex   Fisher', 'Alex Fisher'],
@@ -36,7 +36,7 @@ describe('JoinScreen', () => {
   it('refuses anything that is not a first and last name, and says why', async () => {
     const missing = 'Enter your first and last name.';
     const oneWord = 'Enter your first and last name, so others can tell you apart.';
-    const cases = [
+    const cases: [string, string][] = [
       ['', missing],
       ['   ', missing],
       ['Alex', oneWord],
@@ -51,7 +51,7 @@ describe('JoinScreen', () => {
       await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
       expect(onJoin).not.toHaveBeenCalled();
-      expect(screen.getByRole('alert')).toHaveTextContent(String(message));
+      expect(screen.getByRole('alert')).toHaveTextContent(message);
       cleanup();
     }
   });

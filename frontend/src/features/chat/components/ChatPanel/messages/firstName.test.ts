@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { firstName } from './firstName';
 
 test('takes the first word of a name, whatever the spacing', () => {
-  const cases = [
+  const cases: [string, string][] = [
     ['Alex Fisher', 'Alex'],
     ['Ada Byron Lovelace', 'Ada'],
     ['  Alex   Fisher ', 'Alex'],
@@ -13,6 +13,6 @@ test('takes the first word of a name, whatever the spacing', () => {
   ];
 
   for (const [name, expected] of cases) {
-    expect(firstName(String(name))).toBe(expected);
+    expect(firstName(name)).toBe(expected);
   }
 });
