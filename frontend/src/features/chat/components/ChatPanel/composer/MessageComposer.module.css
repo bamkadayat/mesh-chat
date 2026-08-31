@@ -3,7 +3,6 @@
   margin: 0 1.5rem 1.25rem;
 }
 
-/* One bordered box holding the field and the action row, as the mockup shows. */
 .field {
   display: flex;
   flex-direction: column;
@@ -60,30 +59,24 @@
   margin-left: auto;
 }
 
-/* Attach is the only placeholder left. The mockup draws it, nothing implements
-   it, so it is dimmed to read as unavailable beside the controls that work.
-   0.75 rather than 0.7 keeps it at 3.19:1, above the contrast floor for a UI
-   control even though a disabled one is exempt from it. */
+/* Attach is a placeholder, so it is dimmed to read as unavailable.
+   0.75 rather than 0.7 holds 3.19:1, above the UI contrast floor. */
 .action:disabled {
   cursor: not-allowed;
   opacity: 0.75;
 }
 
-/* Accent means the control can act right now: emoji always can, send only once
-   there is text, attach never. Without it the working emoji button looked
-   exactly like the placeholder beside it. */
+/* Accent marks a control that can act now: emoji always, send once there is
+   text, attach never. Without it emoji looked like the placeholder beside it. */
 .action:enabled {
   color: var(--color-accent);
 }
 
-/* Held while the picker is showing, which is the visible half of aria-expanded. */
 .action:hover:enabled,
 .action[aria-expanded='true'] {
   background: var(--color-track);
 }
 
-/* The same rule as above. The mockup only draws the resting composer, so it
-   specifies no colour for a send that can act. */
 .send:enabled {
   color: var(--color-accent);
 }

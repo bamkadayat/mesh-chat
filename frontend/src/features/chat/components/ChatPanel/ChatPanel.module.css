@@ -48,7 +48,7 @@
   flex-direction: column;
 }
 
-/* Inset like the tabs above and the composer below, so the panel keeps one rhythm. */
+/* Margins match the tabs above, so the two line up. */
 .banner {
   display: flex;
   align-items: center;
@@ -79,7 +79,7 @@
   opacity: 0.25;
 }
 
-/* Dashes shorter than the circumference leave the gap that reads as motion. */
+/* A dash shorter than the circumference leaves the gap that shows it turning. */
 .spinnerArc {
   transform-origin: center;
   stroke-linecap: round;
@@ -93,7 +93,7 @@
   }
 }
 
-/* Without the gap the arc closes into a plain ring, which still reads as busy. */
+/* With no gap the arc is a plain ring, so it can sit still. */
 @media (prefers-reduced-motion: reduce) {
   .banner {
     animation: none;
