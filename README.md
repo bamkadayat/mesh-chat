@@ -42,8 +42,6 @@ pnpm test:server
 pnpm test:e2e
 ```
 
-There are 176 unit tests and one end-to-end test.
-
 The tests focus on the parts that are easy to check in isolation: the protocol,
 reducer, link handling, and ID generation. Component tests cover visible user
 behaviour, such as edit controls, rejected sends, and disabled composer states.
@@ -70,13 +68,6 @@ PORT=3001
 `VITE_` variables are included in the client bundle, so they should not contain
 secrets.
 
-### Running on another device
-
-The development server binds every interface, so Vite also prints a network
-address such as `http://192.168.1.10:5173`. Reaching the app from a phone on the
-same network needs both defaults changed. Without them the client looks for the
-signaling server on the phone itself, and the server refuses the new origin:
-
 ```dotenv
 VITE_SIGNALING_URL=http://192.168.1.10:3001
 CLIENT_ORIGIN=http://192.168.1.10:5173
@@ -92,6 +83,10 @@ This project uses Option B: peer-to-peer chat with WebRTC DataChannels.
 The browser sends chat messages directly to the other browsers in the room. The
 server does not handle chat messages. It tracks who is in the room and forwards
 the signaling events peers need in order to connect.
+
+Socket.IO is used instead of a raw WebSocket because it brings reconnection,
+acknowledgements and disconnect detection with it. The cost is a larger
+dependency and a Socket.IO-specific wire protocol.
 
 What the server receives:
 
@@ -279,12 +274,6 @@ slow down at some point, but it had not at 2,000.
 The list follows new messages only while you are near the bottom. Scrolling up to
 read history stops it following, and scrolling back down resumes it.
 
-That behaviour was worth testing. Under a fast burst the list stopped following
-and never recovered. Auto-scrolling raises scroll events of its own, and during a
-burst one of those can measure a distance against messages that arrived after it.
-New messages and auto-scrolling never move the view up, so only an upward move now
-stops the follow.
-
 ## Bonus Tasks
 
 Four optional tasks are implemented.
@@ -306,91 +295,89 @@ and Escape.
 `ChatEvent` because it does not change the message timeline. Timers clear stale
 typing states if a stop event is missed.
 
-Read receipts, message history, virtualization, Docker, link previews, and
-end-to-end encryption are not implemented.
-
 ## Error Handling
 
-The app treats anything from the network as untrusted. Bad input is rejected or ignored
-instead of crashing the app. User-facing errors are mapped to simple reasons, so raw
-Socket.IO or WebRTC errors never appear on screen.
+Anything from the network is untrusted. Bad input is rejected or ignored instead
+of crashing, and failures cross boundaries as reasons rather than raw strings, so
+Socket.IO and WebRTC text never reaches a participant.
 
-### In the browser
-
-- **Errors use simple reasons.** The app uses `server-unreachable` and `join-rejected`,
-  then turns them into readable messages in the UI.
-- **Joining cannot hang forever.** The join request has a ten second timeout. If the
-  server does not answer, it becomes `no-response`.
-- **Bad peer messages are ignored.** `parsePeerEvent` returns `null` for invalid JSON,
-  unknown events, or invalid message data.
-- **WebRTC failures become state.** If a peer connection cannot be created or negotiation
-  fails, that peer is marked as `failed` and the reason is logged to the console.
-- **Typed text is not lost.** If sending or editing is rejected, the composer keeps the
-  draft.
-- **Failed is different from connecting.** A dead peer shows as `failed`, not as a slow
-  connection.
-- **Signaling recovers on its own, a dead peer does not.** A dropped signaling connection
-  reconnects and rebuilds every channel. A peer channel that fails is not retried, and the
-  composer says to leave and rejoin rather than accepting messages that would go nowhere.
-
-### On the server
-
-- **Payloads are validated before use.** Runtime checks start from `unknown`.
-- **Bad joins get a reply.** The server returns `{ ok: false, reason: 'invalid-payload' }`.
-- **Bad signals are dropped.** Invalid WebRTC offers, answers, or ICE candidates are
-  ignored.
-- **Impersonation is blocked.** A signal is forwarded only if the socket owns the
-  participant ID it claims.
-- **Signals stay inside the room.** The server forwards only to participants in the same
+- **Payloads are validated at runtime.** The peer protocol and the server both
+  start from `unknown` and narrow before use.
+- **Joining cannot hang.** The join request times out after ten seconds and
+  becomes `no-response`.
+- **Bad peer messages are ignored.** `parsePeerEvent` returns `null` for invalid
+  JSON, unknown events, or invalid message data.
+- **Typed text is not lost.** If a send or an edit is rejected, the composer keeps
+  the draft.
+- **Signaling recovers, a dead peer does not.** A dropped signaling connection
+  reconnects and rebuilds every channel. A failed peer channel is not retried, and
+  the composer says to leave and rejoin rather than accepting messages that would
+  go nowhere.
+- **The server checks identity and room.** A signal is forwarded only when the
+  socket owns the participant ID it claims and both participants are in the same
   room.
 
-## Trade-offs
+## Trade-offs and Current Limitations
 
-- **Full mesh.** Every participant connects to every other participant. This is
-  simple and truly peer-to-peer, but it is only suitable for small rooms.
-- **No global message order.** Each peer connection is ordered, but there is no
-  single server deciding the order across all senders.
-- **No authentication.** Ownership checks stop normal UI misuse, but a modified
-  client could still claim another participant's ID.
-- **No TURN server.** If browsers cannot make a direct WebRTC connection, there
-  is no relay fallback.
-- **No message history.** New participants only see messages sent after they join.
-- **One theme.** The app uses design tokens, but only one visual theme is built.
+- **Full mesh.** Every participant connects to every other one. Simple and truly
+  peer-to-peer, but only suitable for small rooms.
+- **No global message order.** Each peer connection is ordered, but no single
+  server decides the order across all senders.
+- **No authentication.** The reducer and the UI enforce edit and delete ownership
+  for normal clients. Because there is no authentication or signed message
+  protocol, a modified client could forge identity fields. These are application
+  rules, not a security boundary.
+- **Encrypted in transit, not end to end.** DataChannels encrypt traffic between
+  connected peers, and the server has no chat message handler. The app does not
+  authenticate participant identities or verify peer fingerprints, so it should
+  not be presented as a fully authenticated end-to-end encrypted system.
+- **No TURN server.** If two browsers cannot connect directly, there is no relay
+  fallback.
+- **No message history.** New participants, and your own reloaded tab, start with
+  an empty timeline. Edge Cases describes the behaviour.
+- **No virtualization.** One DOM node per message. Measured fine at 2,000, but it
+  will slow down eventually.
+- **Two tabs are two participants.** Participant IDs live in `sessionStorage`, so
+  one person in two tabs appears twice under the same name.
+- **Localhost only by default.** Reaching the app from another device needs
+  `VITE_SIGNALING_URL` and `CLIENT_ORIGIN` set, as Configuration describes.
+- **One theme, and no screen reader pass.** Design tokens are in place but only
+  one theme is built, and keyboard and ARIA behaviour has not been checked with
+  VoiceOver or NVDA.
 
-## Known Issues
+## What I’d Improve With More Time
 
-- **Refreshing clears your timeline.** You rejoin with the same participant ID,
-  but your local messages are gone. Other open windows still keep their copies.
-- **Message privacy is architectural, not cryptographic.** The server has no chat
-  message handler, and DataChannels are encrypted in transit. This is not full
-  end-to-end encryption because there is no app-level key management.
-- **No real screen reader pass yet.** Keyboard behaviour and ARIA are covered by
-  tests, but the app has not been checked with VoiceOver or NVDA.
-- **The message list is not virtualized.** It keeps one DOM node per message. It
-  was tested up to 2,000 messages, but it will slow down eventually.
-- **Two tabs count as two participants.** Participant IDs live in
-  `sessionStorage`, so the same person in two tabs appears twice with the same
-  name.
-- **Another device on the network needs configuration.** Vite prints a network
-  address, but the client still expects signaling on `localhost:3001` and the
-  server only accepts the `localhost:5173` origin. Opening that address from a
-  phone fails until both are set, as the Configuration section describes.
+I would prioritize reliability and message consistency before adding more UI
+features.
 
-## What I'd Improve With More Time
-
-- **Message history.** Add history for new participants, either from a peer
-  snapshot or a small history API.
-- **TURN support.** Add a relay so WebRTC works on stricter networks.
-- **Read receipts.** Track which participants have read each message.
-- **Virtualized message list.** Keep the chat fast with 10,000+ messages.
-- **Screen reader testing.** Run the app with VoiceOver or NVDA and fix anything
-  found.
+- **TURN support.** Add a relay fallback so participants can connect when
+  firewalls, corporate networks or restrictive NAT configurations prevent a
+  direct WebRTC connection.
+- **Message history and reconnection recovery.** Let an existing peer send a
+  recent message snapshot to a new or reconnected participant. This would
+  preserve the current architecture where chat content does not pass through the
+  signaling server.
+- **Broader end-to-end coverage.** Expand the Playwright tests to cover
+  reconnection, connection failures, more participants and responsive layouts
+  across supported browsers.
+- **Accessibility testing.** Test complete flows manually with VoiceOver and
+  NVDA because automated tests cannot confirm the full screen-reader experience.
+- **Virtualized message list.** Render only visible timeline items so the
+  interface remains responsive during long conversations with thousands of
+  messages.
+- **Read receipts.** Extend the peer protocol to communicate which participants
+  have received or read each message.
+- **Responsive layouts and theming.** Add a tested dark theme using the existing
+  design tokens. On wider screens, display the participant list beside the
+  conversation instead of placing it behind a tab.
+- **File sharing.** Transfer files directly between peers, with validation, size
+  limits and progress indicators. This would require careful handling because
+  large transfers can affect DataChannel performance.
 
 ## Time Spent
 
-About nine hours across two sessions.
+Approximately nine hours, including cross-browser debugging, automated tests and
+final documentation.
 
-Most of the time went into the core chat flow: signaling, WebRTC connection
-handling, message state, and the UI. The rest went into tests, accessibility,
-the emoji picker, typing indicators, and debugging a Firefox-specific connection
-issue.
+Most of it went into the core chat flow: signaling, WebRTC connection handling,
+message state, and the UI.
