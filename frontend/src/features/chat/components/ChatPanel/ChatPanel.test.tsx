@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Participant } from '../../../../../../shared/signalingEvents';
 import type { SessionStatus, TimelineItem } from '../../model/types';
@@ -56,7 +56,7 @@ function renderPanel(
 const tab = (name: RegExp) => screen.getByRole('tab', { name });
 
 describe('keyboard navigation', () => {
-  test('arrow keys move selection and carry focus with it', async () => {
+  test('arrow keys move the selection, carry focus, and wrap at the ends', async () => {
     const { user } = renderPanel();
 
     tab(/^Chat/).focus();
@@ -67,26 +67,17 @@ describe('keyboard navigation', () => {
     await user.keyboard('{ArrowRight}');
     expect(tab(/^Chat/)).toHaveAttribute('aria-selected', 'true');
     expect(tab(/^Chat/)).toHaveFocus();
-  });
 
-  test('arrows wrap around rather than stopping at the ends', async () => {
-    const { user } = renderPanel();
-
-    tab(/^Chat/).focus();
+    /** Past the last tab, selection wraps rather than stopping. */
     await user.keyboard('{ArrowRight}');
-
     expect(tab(/Participants/)).toHaveAttribute('aria-selected', 'true');
   });
 
-  test('only the selected tab is reachable by Tab, as a tablist requires', () => {
-    renderPanel();
+  test('Tab reaches the leave control, then only the selected tab', async () => {
+    const { onLeave, user } = renderPanel();
 
     expect(tab(/^Chat/)).toHaveAttribute('tabindex', '0');
     expect(tab(/Participants/)).toHaveAttribute('tabindex', '-1');
-  });
-
-  test('Tab reaches the leave control and the tablist in order', async () => {
-    const { onLeave, user } = renderPanel();
 
     await user.tab();
     expect(screen.getByRole('button', { name: 'Leave session' })).toHaveFocus();
@@ -96,9 +87,7 @@ describe('keyboard navigation', () => {
     await user.tab();
     expect(tab(/^Chat/)).toHaveFocus();
   });
-});
 
-describe('panels', () => {
   test('exactly one panel is visible at a time', async () => {
     const { user } = renderPanel();
 
@@ -120,19 +109,15 @@ describe('presence', () => {
     expect(rows[1]).not.toHaveTextContent('(You)');
   });
 
-  test('each participant carries their initials', async () => {
+  test('initials stand in for an avatar and are hidden from assistive technology', async () => {
     const { user } = renderPanel();
     await user.click(tab(/Participants/));
 
     const rows = screen.getAllByRole('listitem');
     expect(rows[0]).toHaveTextContent('AF');
     expect(rows[1]).toHaveTextContent('BF');
-  });
 
-  test('the initials are hidden from assistive technology, being a repeat of the name', async () => {
-    const { user } = renderPanel();
-    await user.click(tab(/Participants/));
-
+    /** They only repeat the name beside them, so they are decorative. */
     const panel = screen.getByRole('tabpanel');
     expect(within(panel).getByText('AF')).toHaveAttribute('aria-hidden', 'true');
   });
@@ -148,9 +133,7 @@ describe('presence', () => {
     expect(rows[1]).toHaveTextContent('Bea Fisher');
     expect(rows[1]).toHaveTextContent('Connecting…');
   });
-});
 
-describe('names', () => {
   test('the participant list shows full names and the chat shows first names', async () => {
     const { user } = renderPanel({ timeline: [messageItem('m-1', 'hello')] });
 
@@ -197,49 +180,34 @@ describe('unread count', () => {
   });
 });
 
-describe('typing indicator', () => {
+describe('live regions', () => {
   const typingLine = () => screen.getByRole('status', { name: 'Typing status' });
 
-  test('nobody typing leaves the line empty, so nothing is announced', () => {
-    renderPanel();
+  test('the typing line names one, both, or several people, and is empty for none', () => {
+    const cases: [string[], string][] = [
+      [[], ''],
+      [['Bea Nolan'], 'Bea is typing…'],
+      [['Bea Nolan', 'Cal Reed'], 'Bea and Cal are typing…'],
+      [['Bea Nolan', 'Cal Reed', 'Dee Shah'], 'Several people are typing…'],
+    ];
 
-    expect(typingLine()).toHaveTextContent('');
+    for (const [names, expected] of cases) {
+      renderPanel({ typingNames: names });
+      expect(typingLine()).toHaveTextContent(expected);
+      /** First names only, to match the messages beside it. */
+      expect(typingLine()).not.toHaveTextContent('Nolan');
+      cleanup();
+    }
   });
 
-  test('one person is named, by first name like the messages beside it', () => {
-    renderPanel({ typingNames: ['Bea Nolan'] });
+  test('connection changes are announced, not only shown', () => {
+    const status = () => screen.getByRole('status', { name: 'Connection status' });
 
-    expect(typingLine()).toHaveTextContent('Bea is typing…');
-    expect(typingLine()).not.toHaveTextContent('Nolan');
-  });
-
-  test('two people are both named', () => {
-    renderPanel({ typingNames: ['Bea Nolan', 'Cal Reed'] });
-
-    expect(typingLine()).toHaveTextContent('Bea and Cal are typing…');
-  });
-
-  test('more than two are summarised rather than listed', () => {
-    renderPanel({ typingNames: ['Bea Nolan', 'Cal Reed', 'Dee Shah'] });
-
-    expect(typingLine()).toHaveTextContent('Several people are typing…');
-  });
-});
-
-describe('connection announcements', () => {
-  test('a reconnect is announced, not only shown', () => {
     renderPanel({ status: 'reconnecting' });
+    expect(status()).toHaveTextContent('Reconnecting to the chat server');
+    cleanup();
 
-    expect(screen.getByRole('status', { name: 'Connection status' })).toHaveTextContent(
-      'Reconnecting to the chat server',
-    );
-  });
-
-  test('a healthy session announces that sending is possible', () => {
     renderPanel();
-
-    expect(screen.getByRole('status', { name: 'Connection status' })).toHaveTextContent(
-      'Connected. You can send messages.',
-    );
+    expect(status()).toHaveTextContent('Connected. You can send messages.');
   });
 });

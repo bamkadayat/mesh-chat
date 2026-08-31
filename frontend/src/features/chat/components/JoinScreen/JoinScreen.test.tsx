@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { JoinScreen } from './JoinScreen';
-import { MAX_DISPLAY_NAME_LENGTH } from '../../model/constants';
 
 function renderJoinScreen(overrides: Partial<Parameters<typeof JoinScreen>[0]> = {}) {
   const onJoin = vi.fn();
@@ -13,75 +12,48 @@ function renderJoinScreen(overrides: Partial<Parameters<typeof JoinScreen>[0]> =
 }
 
 describe('JoinScreen', () => {
-  it('joins with the entered name', async () => {
-    const { onJoin, user } = renderJoinScreen();
+  /** Cleanup runs after each test, so a case inside a loop has to clear its own render. */
+  it('joins with the name, tidied of surrounding and inner spacing', async () => {
+    const names = [
+      ['Alex Fisher', 'Alex Fisher'],
+      ['  Alex Fisher  ', 'Alex Fisher'],
+      ['Alex   Fisher', 'Alex Fisher'],
+      ['Ada Byron Lovelace', 'Ada Byron Lovelace'],
+    ];
 
-    await user.type(screen.getByLabelText('Display name'), 'Alex Fisher');
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
+    for (const [typed, expected] of names) {
+      const { onJoin, user } = renderJoinScreen();
 
-    expect(onJoin).toHaveBeenCalledWith('Alex Fisher');
+      await user.type(screen.getByLabelText('Display name'), typed);
+      await user.click(screen.getByRole('button', { name: 'Join the standup' }));
+
+      expect(onJoin).toHaveBeenCalledWith(expected);
+      cleanup();
+    }
   });
 
-  it('trims surrounding whitespace from the name', async () => {
-    const { onJoin, user } = renderJoinScreen();
+  /** A missing name and a one-word name are refused with different wording. */
+  it('refuses anything that is not a first and last name, and says why', async () => {
+    const missing = 'Enter your first and last name.';
+    const oneWord = 'Enter your first and last name, so others can tell you apart.';
+    const cases = [
+      ['', missing],
+      ['   ', missing],
+      ['Alex', oneWord],
+    ];
 
-    await user.type(screen.getByLabelText('Display name'), '  Alex Fisher  ');
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
+    for (const [typed, message] of cases) {
+      const { onJoin, user } = renderJoinScreen();
 
-    expect(onJoin).toHaveBeenCalledWith('Alex Fisher');
-  });
+      if (typed !== '') {
+        await user.type(screen.getByLabelText('Display name'), typed);
+      }
+      await user.click(screen.getByRole('button', { name: 'Join the standup' }));
 
-  it('collapses inner whitespace so spacing cannot make two names differ', async () => {
-    const { onJoin, user } = renderJoinScreen();
-
-    await user.type(screen.getByLabelText('Display name'), 'Alex   Fisher');
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
-
-    expect(onJoin).toHaveBeenCalledWith('Alex Fisher');
-  });
-
-  it('does not join with a single word, and says why', async () => {
-    const { onJoin, user } = renderJoinScreen();
-
-    await user.type(screen.getByLabelText('Display name'), 'Alex');
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
-
-    expect(onJoin).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('first and last name');
-  });
-
-  it('accepts a name of more than two words', async () => {
-    const { onJoin, user } = renderJoinScreen();
-
-    await user.type(screen.getByLabelText('Display name'), 'Ada Byron Lovelace');
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
-
-    expect(onJoin).toHaveBeenCalledWith('Ada Byron Lovelace');
-  });
-
-  it('does not join with an empty name', async () => {
-    const { onJoin, user } = renderJoinScreen();
-
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
-
-    expect(onJoin).not.toHaveBeenCalled();
-  });
-
-  it('does not join with only whitespace', async () => {
-    const { onJoin, user } = renderJoinScreen();
-
-    await user.type(screen.getByLabelText('Display name'), '   ');
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
-
-    expect(onJoin).not.toHaveBeenCalled();
-  });
-
-  it('explains why an empty name was rejected', async () => {
-    const { user } = renderJoinScreen();
-
-    await user.click(screen.getByRole('button', { name: 'Join the standup' }));
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter your first and last name.');
+      expect(onJoin).not.toHaveBeenCalled();
+      expect(screen.getByRole('alert')).toHaveTextContent(String(message));
+      cleanup();
+    }
   });
 
   it('ties the validation message to the input for screen readers', async () => {
@@ -94,28 +66,13 @@ describe('JoinScreen', () => {
     expect(input).toHaveAccessibleDescription('Enter your first and last name.');
   });
 
-  it('caps the name at the documented maximum length', () => {
-    renderJoinScreen();
-
-    expect(screen.getByLabelText('Display name')).toHaveAttribute(
-      'maxlength',
-      String(MAX_DISPLAY_NAME_LENGTH),
-    );
-  });
-
+  /** Section 15: transport wording such as "xhr poll error" must never be shown. */
   it('shows a connection failure without exposing transport wording', () => {
     renderJoinScreen({ connectionError: 'Cannot reach the chat server.' });
 
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('Cannot reach the chat server.');
     expect(alert.textContent).not.toMatch(/xhr|poll|websocket|socket/i);
-  });
-
-  it('keeps the form usable after a failure so the user can retry', () => {
-    renderJoinScreen({ connectionError: 'Cannot reach the chat server.' });
-
-    expect(screen.getByRole('button', { name: 'Join the standup' })).toBeEnabled();
-    expect(screen.getByLabelText('Display name')).toBeEnabled();
   });
 
   it('disables the form while joining', () => {

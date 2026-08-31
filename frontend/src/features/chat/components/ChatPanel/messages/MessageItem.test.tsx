@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ChatMessage } from '../../../model/types';
 import { MessageItem } from './MessageItem';
@@ -26,6 +26,9 @@ function renderItem(overrides: Partial<ChatMessage> = {}, isOwn = true) {
   return { onEdit, onDelete, user: userEvent.setup() };
 }
 
+const DELETED_AT = '2026-08-30T09:16:00.000Z';
+const EDITED_AT = '2026-08-30T09:16:00.000Z';
+
 describe('ownership', () => {
   test('the author gets edit and delete controls', () => {
     renderItem();
@@ -40,41 +43,64 @@ describe('ownership', () => {
     expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull();
   });
+});
 
-  test('a deleted message offers nothing to act on, even to its author', () => {
-    renderItem({ deletedAt: '2026-08-30T09:16:00.000Z' });
+describe('rendering', () => {
+  test('your own message says You, another participant is named by first name', () => {
+    renderItem({ authorName: 'Alex Fisher' }, true);
+    expect(screen.getByText('You')).toBeInTheDocument();
+    expect(screen.queryByText('Alex')).toBeNull();
+    cleanup();
 
+    renderItem({ authorName: 'Bea Fisher' }, false);
+    expect(screen.getByText('Bea')).toBeInTheDocument();
+    expect(screen.queryByText('You')).toBeNull();
+    expect(screen.queryByText('Bea Fisher')).toBeNull();
+  });
+
+  test('an edit keeps the text and adds the edited label, which is otherwise absent', () => {
+    renderItem();
+    expect(screen.queryByText('(edited)')).toBeNull();
+    cleanup();
+
+    renderItem({ text: 'the new text', editedAt: EDITED_AT });
+    expect(screen.getByText('the new text')).toBeInTheDocument();
+    expect(screen.getByText('(edited)')).toBeInTheDocument();
+  });
+
+  test('a deleted message shows a tombstone and offers nothing to act on', () => {
+    renderItem({ deletedAt: DELETED_AT });
+
+    expect(screen.getByText('Message deleted')).toBeInTheDocument();
+    expect(screen.queryByText('the original text')).toBeNull();
+    /** Even its own author has nothing left to edit or delete. */
     expect(screen.queryByRole('button', { name: /^Edit/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Delete/ })).toBeNull();
   });
 });
 
-describe('telling your own messages apart', () => {
-  test('your own message is labelled You, not your name', () => {
-    renderItem({ authorName: 'Alex Fisher' }, true);
-
-    expect(screen.getByText('You')).toBeInTheDocument();
-    expect(screen.queryByText('Alex')).toBeNull();
-  });
-
-  test('another participant is named by their first name', () => {
-    renderItem({ authorName: 'Bea Fisher' }, false);
-
-    expect(screen.getByText('Bea')).toBeInTheDocument();
-    expect(screen.queryByText('You')).toBeNull();
-    expect(screen.queryByText('Bea Fisher')).toBeNull();
-  });
-});
-
 describe('accessible names', () => {
-  test('each action names the message it acts on, not just the verb', () => {
+  test('each action names the message it acts on, trimmed to one short line', () => {
     renderItem({ text: 'ship it before lunch' });
-
     expect(
       screen.getByRole('button', { name: 'Edit message: ship it before lunch' }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Delete message: ship it before lunch' }),
+    ).toBeInTheDocument();
+    cleanup();
+
+    /** A long message is cut, so a screen reader is not read the whole thing. */
+    renderItem({ text: 'a'.repeat(120) });
+    expect(screen.getByRole('button', { name: /^Edit/ }).getAttribute('aria-label')).toBe(
+      `Edit message: ${'a'.repeat(40)}…`,
+    );
+    cleanup();
+
+    /** Newlines are collapsed so the name stays on one line. */
+    renderItem({ text: 'line one\n\nline two' });
+    expect(
+      screen.getByRole('button', { name: 'Edit message: line one line two' }),
     ).toBeInTheDocument();
   });
 
@@ -96,62 +122,20 @@ describe('accessible names', () => {
     expect(names).toContain('Edit message: first');
     expect(names).toContain('Edit message: second');
   });
-
-  test('a long message is truncated rather than read out in full', () => {
-    renderItem({ text: 'a'.repeat(120) });
-
-    const label = screen
-      .getByRole('button', { name: /^Edit/ })
-      .getAttribute('aria-label');
-    expect(label).toBe(`Edit message: ${'a'.repeat(40)}…`);
-  });
-
-  test('newlines are collapsed so the name stays on one line', () => {
-    renderItem({ text: 'line one\n\nline two' });
-
-    expect(
-      screen.getByRole('button', { name: 'Edit message: line one line two' }),
-    ).toBeInTheDocument();
-  });
-
-  test('the visible text stays short', () => {
-    renderItem({ text: 'ship it' });
-
-    expect(screen.getByRole('button', { name: /^Edit/ })).toHaveTextContent('Edit');
-  });
-});
-
-describe('rendering', () => {
-  test('an edited message keeps its text and gains the edited label', () => {
-    renderItem({ text: 'the new text', editedAt: '2026-08-30T09:16:00.000Z' });
-
-    expect(screen.getByText('the new text')).toBeInTheDocument();
-    expect(screen.getByText('(edited)')).toBeInTheDocument();
-  });
-
-  test('a deleted message shows a tombstone instead of its text', () => {
-    renderItem({ deletedAt: '2026-08-30T09:16:00.000Z' });
-
-    expect(screen.getByText('Message deleted')).toBeInTheDocument();
-    expect(screen.queryByText('the original text')).toBeNull();
-  });
-
-  test('an unedited message has no edited label', () => {
-    renderItem();
-
-    expect(screen.queryByText('(edited)')).toBeNull();
-  });
 });
 
 describe('editing', () => {
-  test('saving sends the trimmed text and closes the field', async () => {
+  test('saving sends the trimmed text, and an emptied field is never sent', async () => {
     const { onEdit, user } = renderItem();
 
     await user.click(screen.getByRole('button', { name: /^Edit/ }));
     await user.clear(screen.getByLabelText('Edit message'));
+    await user.type(screen.getByLabelText('Edit message'), '   ');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onEdit).not.toHaveBeenCalled();
+
     await user.type(screen.getByLabelText('Edit message'), '  changed  ');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-
     expect(onEdit).toHaveBeenCalledWith('m-1', 'changed');
     expect(screen.queryByLabelText('Edit message')).toBeNull();
   });
@@ -168,20 +152,9 @@ describe('editing', () => {
     expect(field).toHaveValue('the original text more');
   });
 
-  test('closing the editor returns focus to the control that opened it', async () => {
-    const { user } = renderItem();
-
-    await user.click(screen.getByRole('button', { name: /^Edit/ }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(screen.getByRole('button', { name: /^Edit/ })).toHaveFocus();
-  });
-
   test('a rejected edit keeps the field open so the text is not lost', async () => {
     const onEdit = vi.fn(() => false);
-    render(
-      <MessageItem message={message()} isOwn onEdit={onEdit} onDelete={() => true} />,
-    );
+    render(<MessageItem message={message()} isOwn onEdit={onEdit} onDelete={() => true} />);
     const user = userEvent.setup();
 
     await user.click(screen.getByRole('button', { name: /^Edit/ }));
@@ -192,36 +165,33 @@ describe('editing', () => {
     expect(screen.getByLabelText('Edit message')).toHaveValue('the original text!');
   });
 
-  test('an emptied field is never saved', async () => {
-    const { onEdit, user } = renderItem();
+  test('Cancel and Escape both abandon the edit and send nothing', async () => {
+    for (const abandon of ['cancel', 'escape'] as const) {
+      const { onEdit, user } = renderItem();
 
-    await user.click(screen.getByRole('button', { name: /^Edit/ }));
-    await user.clear(screen.getByLabelText('Edit message'));
-    await user.type(screen.getByLabelText('Edit message'), '   ');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+      await user.click(screen.getByRole('button', { name: /^Edit/ }));
+      await user.type(screen.getByLabelText('Edit message'), ' and more');
 
-    expect(onEdit).not.toHaveBeenCalled();
+      if (abandon === 'cancel') {
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      } else {
+        await user.keyboard('{Escape}');
+      }
+
+      expect(onEdit).not.toHaveBeenCalled();
+      expect(screen.queryByLabelText('Edit message')).toBeNull();
+      expect(screen.getByText('the original text')).toBeInTheDocument();
+      cleanup();
+    }
   });
 
-  test('cancelling restores the original text and sends nothing', async () => {
-    const { onEdit, user } = renderItem();
+  test('closing the editor returns focus to the control that opened it', async () => {
+    const { user } = renderItem();
 
     await user.click(screen.getByRole('button', { name: /^Edit/ }));
-    await user.type(screen.getByLabelText('Edit message'), ' and more');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    expect(onEdit).not.toHaveBeenCalled();
-    expect(screen.getByText('the original text')).toBeInTheDocument();
-  });
-
-  test('Escape abandons the edit', async () => {
-    const { onEdit, user } = renderItem();
-
-    await user.click(screen.getByRole('button', { name: /^Edit/ }));
-    await user.type(screen.getByLabelText('Edit message'), '{Escape}');
-
-    expect(onEdit).not.toHaveBeenCalled();
-    expect(screen.queryByLabelText('Edit message')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Edit/ })).toHaveFocus();
   });
 });
 

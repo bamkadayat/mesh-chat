@@ -17,22 +17,14 @@ describe('createId', () => {
     vi.restoreAllMocks();
   });
 
-  it('returns a valid v4 UUID in a secure context', () => {
+  it('returns unique, valid v4 UUIDs with or without randomUUID', () => {
     expect(createId()).toMatch(UUID_V4);
-  });
 
-  it('falls back to a valid v4 UUID when randomUUID is unavailable', () => {
     withoutRandomUUID();
-
     expect('randomUUID' in globalThis.crypto).toBe(false);
     expect(createId()).toMatch(UUID_V4);
-  });
-
-  it('produces unique values through the fallback', () => {
-    withoutRandomUUID();
 
     const ids = new Set(Array.from({ length: 500 }, () => createId()));
-
     expect(ids.size).toBe(500);
   });
 

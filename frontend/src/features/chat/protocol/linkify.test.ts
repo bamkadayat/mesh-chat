@@ -2,11 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { linkify } from './linkify';
 
 describe('linkify', () => {
-  it('leaves plain text as a single token', () => {
+  it('leaves plain text alone, and returns nothing for empty text', () => {
     expect(linkify('just a message')).toEqual([{ kind: 'text', value: 'just a message' }]);
-  });
-
-  it('returns nothing for empty text', () => {
     expect(linkify('')).toEqual([]);
   });
 
@@ -57,25 +54,19 @@ describe('linkify', () => {
     ]);
   });
 
-  it('does not link other schemes', () => {
+  it('does not link other schemes, or a bare domain without one', () => {
     for (const value of ['ftp://example.com', 'file:///etc/passwd', 'data:text/html,x']) {
       expect(linkify(value)).toEqual([{ kind: 'text', value }]);
     }
-  });
-
-  it('does not link a bare domain without a scheme', () => {
     expect(linkify('example.com is a site')).toEqual([
       { kind: 'text', value: 'example.com is a site' },
     ]);
   });
 
-  it('leaves a malformed URL as plain text', () => {
+  it('leaves a malformed URL as plain text, with the words around it', () => {
     for (const value of ['https://[', 'http://%%']) {
       expect(linkify(value)).toEqual([{ kind: 'text', value }]);
     }
-  });
-
-  it('keeps the text around a malformed URL', () => {
     expect(linkify('try https://[ now')).toEqual([
       { kind: 'text', value: 'try https://[ now' },
     ]);

@@ -1,125 +1,104 @@
 import { describe, expect, test, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MessageComposer } from './MessageComposer';
 
-test('blank input is never sent', async () => {
+function renderComposer(
+  overrides: Partial<Parameters<typeof MessageComposer>[0]> = {},
+) {
   const onSend = vi.fn(() => true);
-  render(<MessageComposer readiness="open" onSend={onSend} onTyping={() => undefined} />);
-  const user = userEvent.setup();
+  const onTyping = vi.fn();
+  const view = render(
+    <MessageComposer readiness="open" onSend={onSend} onTyping={onTyping} {...overrides} />,
+  );
+  return { onSend, onTyping, view, user: userEvent.setup() };
+}
 
-  await user.type(screen.getByLabelText('Write to everyone'), '   ');
-  await user.keyboard('{Enter}');
+const field = () => screen.getByLabelText<HTMLTextAreaElement>('Write to everyone');
+const sendButton = () => screen.getByRole('button', { name: 'Send message' });
 
-  expect(onSend).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
-});
+describe('sending', () => {
+  test('blank input is never sent, and real text enables the button', async () => {
+    const { onSend, user } = renderComposer();
 
-test('the send button becomes usable as soon as there is real text', async () => {
-  render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-  const user = userEvent.setup();
-  const send = screen.getByRole('button', { name: 'Send message' });
+    expect(sendButton()).toBeDisabled();
+    await user.type(field(), '   ');
+    await user.keyboard('{Enter}');
+    expect(onSend).not.toHaveBeenCalled();
+    expect(sendButton()).toBeDisabled();
 
-  expect(send).toBeDisabled();
-  await user.type(screen.getByLabelText('Write to everyone'), 'hi');
-  expect(send).toBeEnabled();
-});
+    await user.type(field(), 'hi');
+    expect(sendButton()).toBeEnabled();
+  });
 
-test('a message is trimmed, sent and cleared', async () => {
-  const onSend = vi.fn(() => true);
-  render(<MessageComposer readiness="open" onSend={onSend} onTyping={() => undefined} />);
-  const user = userEvent.setup();
+  test('a message is trimmed, sent and cleared', async () => {
+    const { onSend, user } = renderComposer();
 
-  await user.type(screen.getByLabelText('Write to everyone'), '  hello  ');
-  await user.click(screen.getByRole('button', { name: 'Send message' }));
+    await user.type(field(), '  hello  ');
+    await user.click(sendButton());
 
-  expect(onSend).toHaveBeenCalledWith('hello');
-  expect(screen.getByLabelText('Write to everyone')).toHaveValue('');
-});
+    expect(onSend).toHaveBeenCalledWith('hello');
+    expect(field()).toHaveValue('');
+  });
 
-test('a rejected send keeps the draft', async () => {
-  const onSend = vi.fn(() => false);
-  render(<MessageComposer readiness="open" onSend={onSend} onTyping={() => undefined} />);
-  const user = userEvent.setup();
+  test('a rejected send keeps the draft', async () => {
+    /** The rejecting mock has to be the one asserted on, not the default. */
+    const onSend = vi.fn(() => false);
+    const { user } = renderComposer({ onSend });
 
-  await user.type(screen.getByLabelText('Write to everyone'), 'hello');
-  await user.keyboard('{Enter}');
+    await user.type(field(), 'hello');
+    await user.keyboard('{Enter}');
 
-  expect(onSend).toHaveBeenCalled();
-  expect(screen.getByLabelText('Write to everyone')).toHaveValue('hello');
-});
+    expect(onSend).toHaveBeenCalledWith('hello');
+    expect(field()).toHaveValue('hello');
+  });
 
-test('sending is blocked while an expected peer channel is not open', async () => {
-  const onSend = vi.fn(() => true);
-  render(<MessageComposer readiness="connecting" onSend={onSend} onTyping={() => undefined} />);
-  const user = userEvent.setup();
+  test('sending is blocked while an expected peer channel is not open', async () => {
+    const { onSend, user } = renderComposer({ readiness: 'connecting' });
 
-  await user.type(screen.getByLabelText('Write to everyone'), 'hello');
-  await user.keyboard('{Enter}');
+    await user.type(field(), 'hello');
+    await user.keyboard('{Enter}');
 
-  expect(onSend).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
-  expect(screen.getByRole('status')).toHaveTextContent('Connecting to participants');
-});
+    expect(onSend).not.toHaveBeenCalled();
+    expect(sendButton()).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Connecting to participants');
+  });
 
-test('the attachment control is exposed as unavailable', () => {
-  render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
+  test('the attachment control is exposed as unavailable', () => {
+    renderComposer();
 
-  expect(screen.getByRole('button', { name: /Attach files \(not available/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Attach files \(not available/ })).toBeDisabled();
+  });
 });
 
 describe('typing announcements', () => {
-  test('peers are told once, not per keystroke', async () => {
-    const onTyping = vi.fn();
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={onTyping} />);
-    const user = userEvent.setup();
+  test('peers are told once, not per keystroke, and whitespace does not count', async () => {
+    const { onTyping, user } = renderComposer();
 
-    await user.type(screen.getByLabelText('Write to everyone'), 'hello');
+    await user.type(field(), '   ');
+    expect(onTyping).not.toHaveBeenCalled();
 
+    await user.type(field(), 'hello');
     expect(onTyping.mock.calls).toEqual([[true]]);
   });
 
-  test('emptying the field says the typing stopped', async () => {
-    const onTyping = vi.fn();
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={onTyping} />);
-    const user = userEvent.setup();
-    const field = screen.getByLabelText('Write to everyone');
+  test('typing stops after clearing the field and after sending', async () => {
+    const cleared = renderComposer();
+    await cleared.user.type(field(), 'hello');
+    await cleared.user.clear(field());
+    expect(cleared.onTyping.mock.calls).toEqual([[true], [false]]);
+    cleanup();
 
-    await user.type(field, 'hello');
-    await user.clear(field);
-
-    expect(onTyping.mock.calls).toEqual([[true], [false]]);
-  });
-
-  test('sending says the typing stopped', async () => {
-    const onTyping = vi.fn();
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={onTyping} />);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByLabelText('Write to everyone'), 'hello');
-    await user.keyboard('{Enter}');
-
-    expect(onTyping.mock.calls).toEqual([[true], [false]]);
-  });
-
-  test('whitespace alone does not count as typing', async () => {
-    const onTyping = vi.fn();
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={onTyping} />);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByLabelText('Write to everyone'), '   ');
-
-    expect(onTyping).not.toHaveBeenCalled();
+    const sent = renderComposer();
+    await sent.user.type(field(), 'hello');
+    await sent.user.keyboard('{Enter}');
+    expect(sent.onTyping.mock.calls).toEqual([[true], [false]]);
   });
 
   test('unmounting mid-sentence does not strand the indicator', async () => {
-    const onTyping = vi.fn();
-    const view = render(
-      <MessageComposer readiness="open" onSend={() => true} onTyping={onTyping} />,
-    );
-    const user = userEvent.setup();
+    const { onTyping, view, user } = renderComposer();
 
-    await user.type(screen.getByLabelText('Write to everyone'), 'hello');
+    await user.type(field(), 'hello');
     view.unmount();
 
     expect(onTyping.mock.calls).toEqual([[true], [false]]);
@@ -132,112 +111,73 @@ describe('emoji picker', () => {
     return screen.getByRole('dialog', { name: 'Choose emoji' });
   };
 
-  test('the toggle reports whether the picker is open', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
+  test('the picker opens and closes accessibly', async () => {
+    const { user } = renderComposer();
     const toggle = screen.getByRole('button', { name: 'Choose emoji' });
 
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    await user.click(toggle);
+    await openPicker(user);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
 
-  test('choosing an emoji inserts it at the caret, not at the end', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
-    const field = screen.getByLabelText<HTMLTextAreaElement>('Write to everyone');
-
-    await user.type(field, 'hello world');
-    field.setSelectionRange(5, 5);
-
-    await openPicker(user);
-    await user.click(screen.getByRole('button', { name: 'thumbs up' }));
-
-    expect(field).toHaveValue('hello👍 world');
+    await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(field()).toHaveFocus();
   });
 
-  test('the caret lands after the inserted emoji so typing continues there', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
-    const field = screen.getByLabelText<HTMLTextAreaElement>('Write to everyone');
+  test('an emoji inserts at the caret, leaves it after, and replaces a selection', async () => {
+    const inserted = renderComposer();
+    await inserted.user.type(field(), 'hello world');
+    field().setSelectionRange(5, 5);
+    await openPicker(inserted.user);
+    await inserted.user.click(screen.getByRole('button', { name: 'thumbs up' }));
+    expect(field()).toHaveValue('hello👍 world');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    cleanup();
 
-    await openPicker(user);
-    await user.click(screen.getByRole('button', { name: 'rocket' }));
+    /** The caret follows the emoji, so typing carries on after it. */
+    const caret = renderComposer();
+    await openPicker(caret.user);
+    await caret.user.click(screen.getByRole('button', { name: 'rocket' }));
+    expect(field()).toHaveFocus();
+    expect(field().selectionStart).toBe('🚀'.length);
+    await caret.user.keyboard(' ship it');
+    expect(field()).toHaveValue('🚀 ship it');
+    cleanup();
 
-    expect(field).toHaveFocus();
-    expect(field.selectionStart).toBe('🚀'.length);
-    await user.keyboard(' ship it');
-    expect(field).toHaveValue('🚀 ship it');
+    const selection = renderComposer();
+    await selection.user.type(field(), 'yes no');
+    field().setSelectionRange(4, 6);
+    await openPicker(selection.user);
+    await selection.user.click(screen.getByRole('button', { name: 'thumbs up' }));
+    expect(field()).toHaveValue('yes 👍');
   });
 
-  test('an emoji replaces the selected text', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
-    const field = screen.getByLabelText<HTMLTextAreaElement>('Write to everyone');
+  test('the picker is keyboard operable and holds a single tab stop', async () => {
+    const { user } = renderComposer();
+    const panel = await openPicker(user);
 
-    await user.type(field, 'yes no');
-    field.setSelectionRange(4, 6);
-
-    await openPicker(user);
-    await user.click(screen.getByRole('button', { name: 'thumbs up' }));
-
-    expect(field).toHaveValue('yes 👍');
-  });
-
-  test('the picker opens with focus on it and arrow keys move through it', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
-    await openPicker(user);
-
+    /** A roving tabindex, so Tab does not walk the whole grid. */
+    const tabbable = within(panel)
+      .getAllByRole('button')
+      .filter((button) => button.getAttribute('tabindex') !== '-1');
+    expect(within(panel).getAllByRole('button').length).toBeGreaterThan(10);
+    expect(tabbable).toHaveLength(1);
+    expect(tabbable[0]).toHaveAccessibleName('grinning face');
     expect(screen.getByRole('button', { name: 'grinning face' })).toHaveFocus();
 
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('button', { name: 'face with tears of joy' })).toHaveFocus();
 
-    /** eight per row, so down moves eight further on */
+    /** Eight per row, so down moves eight further on. */
     await user.keyboard('{ArrowDown}');
     expect(screen.getByRole('button', { name: 'partying face' })).toHaveFocus();
 
     await user.keyboard('{ArrowLeft}');
     expect(screen.getByRole('button', { name: 'smiling face with sunglasses' })).toHaveFocus();
-  });
 
-  test('only one emoji is a tab stop, so Tab does not walk the whole grid', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
-    const panel = await openPicker(user);
-
-    const tabbable = within(panel)
-      .getAllByRole('button')
-      .filter((button) => button.getAttribute('tabindex') !== '-1');
-
-    expect(within(panel).getAllByRole('button').length).toBeGreaterThan(10);
-    expect(tabbable).toHaveLength(1);
-    expect(tabbable[0]).toHaveAccessibleName('grinning face');
-  });
-
-  test('an emoji can be chosen with the keyboard alone', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
-    await openPicker(user);
-
-    await user.keyboard('{ArrowRight}{Enter}');
-
-    expect(screen.getByLabelText('Write to everyone')).toHaveValue('😂');
-  });
-
-  test('Escape closes the picker and returns focus to the field', async () => {
-    render(<MessageComposer readiness="open" onSend={() => true} onTyping={() => undefined} />);
-    const user = userEvent.setup();
-    await openPicker(user);
-
-    await user.keyboard('{Escape}');
-
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByLabelText('Write to everyone')).toHaveFocus();
+    await user.keyboard('{ArrowUp}{ArrowRight}{Enter}');
+    expect(field()).toHaveValue('😂');
   });
 });
