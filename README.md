@@ -31,9 +31,8 @@ pnpm check
 
 ## Tests
 
-The project has unit tests for the frontend and the server. It also has a
-Playwright end-to-end test that opens two real browser participants and checks
-the full chat flow: join, connect, send, edit, delete, and leave.
+The project includes focused frontend and server unit tests, plus a Playwright
+end-to-end test covering the complete two-participant chat flow.
 
 ```bash
 pnpm test
