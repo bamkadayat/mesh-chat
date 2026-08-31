@@ -3,6 +3,11 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "packageManager": "pnpm@9.4.0",
+  "engines": {
+    "node": ">=22.12",
+    "pnpm": ">=9"
+  },
   "scripts": {
     "dev": "concurrently -n frontend,server -c cyan,magenta \"pnpm dev:frontend\" \"pnpm dev:server\"",
     "dev:frontend": "vite --config frontend/vite.config.ts",

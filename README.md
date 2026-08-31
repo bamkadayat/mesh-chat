@@ -8,9 +8,11 @@ and presence only.
 
 ## Getting Started
 
-Requires Node.js 22+, pnpm 9+, and a modern browser with WebRTC support.
+Requires Node.js 22.12+, pnpm 9+, and a modern browser with WebRTC support. The
+pnpm version is pinned in `package.json`, so Corepack can fetch a matching one:
 
 ```bash
+corepack enable
 pnpm install
 pnpm dev
 ```
@@ -67,6 +69,21 @@ PORT=3001
 
 `VITE_` variables are included in the client bundle, so they should not contain
 secrets.
+
+### Running on another device
+
+The development server binds every interface, so Vite also prints a network
+address such as `http://192.168.1.10:5173`. Reaching the app from a phone on the
+same network needs both defaults changed. Without them the client looks for the
+signaling server on the phone itself, and the server refuses the new origin:
+
+```dotenv
+VITE_SIGNALING_URL=http://192.168.1.10:3001
+CLIENT_ORIGIN=http://192.168.1.10:5173
+```
+
+Use the address your own machine reports, then restart `pnpm dev`. Vite reads
+`VITE_` variables at startup, so a running server will not pick them up.
 
 ## Architecture: Option B, Peer-to-Peer
 
@@ -354,6 +371,10 @@ Socket.IO or WebRTC errors never appear on screen.
 - **Two tabs count as two participants.** Participant IDs live in
   `sessionStorage`, so the same person in two tabs appears twice with the same
   name.
+- **Another device on the network needs configuration.** Vite prints a network
+  address, but the client still expects signaling on `localhost:3001` and the
+  server only accepts the `localhost:5173` origin. Opening that address from a
+  phone fails until both are set, as the Configuration section describes.
 
 ## What I'd Improve With More Time
 
