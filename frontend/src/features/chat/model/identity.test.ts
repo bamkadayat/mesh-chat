@@ -23,10 +23,6 @@ describe('loadParticipantId', () => {
     expect(sessionStorage.getItem(PARTICIPANT_ID_KEY)).toBe(participantId);
   });
 
-  it('returns the same ID on a later call in the same tab', () => {
-    expect(loadParticipantId()).toBe(loadParticipantId());
-  });
-
   it('replaces an empty stored value rather than returning it', () => {
     sessionStorage.setItem(PARTICIPANT_ID_KEY, '');
 

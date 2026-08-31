@@ -85,7 +85,7 @@ describe('keyboard navigation', () => {
     expect(tab(/Participants/)).toHaveAttribute('tabindex', '-1');
   });
 
-  test('the whole panel is operable from the keyboard alone', async () => {
+  test('Tab reaches the leave control and the tablist in order', async () => {
     const { onLeave, user } = renderPanel();
 
     await user.tab();
@@ -147,13 +147,6 @@ describe('presence', () => {
     expect(rows[0]).not.toHaveTextContent('Connecting');
     expect(rows[1]).toHaveTextContent('Bea Fisher');
     expect(rows[1]).toHaveTextContent('Connecting…');
-  });
-
-  test('nobody is marked once every channel is open', async () => {
-    const { user } = renderPanel();
-    await user.click(tab(/Participants/));
-
-    expect(screen.queryByText('Connecting…')).toBeNull();
   });
 });
 

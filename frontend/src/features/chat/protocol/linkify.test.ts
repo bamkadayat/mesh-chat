@@ -10,16 +10,10 @@ describe('linkify', () => {
     expect(linkify('')).toEqual([]);
   });
 
-  it('finds an https URL', () => {
-    expect(linkify('https://example.com')).toEqual([
-      { kind: 'link', value: 'https://example.com' },
-    ]);
-  });
-
-  it('finds an http URL', () => {
-    expect(linkify('http://example.com')).toEqual([
-      { kind: 'link', value: 'http://example.com' },
-    ]);
+  it('finds an http or https URL', () => {
+    for (const value of ['https://example.com', 'http://example.com']) {
+      expect(linkify(value)).toEqual([{ kind: 'link', value }]);
+    }
   });
 
   it('keeps the text around a URL', () => {
@@ -38,15 +32,12 @@ describe('linkify', () => {
     ]);
   });
 
-  it('leaves a trailing full stop out of the link', () => {
+  it('leaves trailing punctuation out of the link', () => {
     expect(linkify('go to https://example.com.')).toEqual([
       { kind: 'text', value: 'go to ' },
       { kind: 'link', value: 'https://example.com' },
       { kind: 'text', value: '.' },
     ]);
-  });
-
-  it('leaves a trailing comma and bracket out of the link', () => {
     expect(linkify('(https://example.com), next')).toEqual([
       { kind: 'text', value: '(' },
       { kind: 'link', value: 'https://example.com' },
@@ -90,7 +81,7 @@ describe('linkify', () => {
     ]);
   });
 
-  it('never produces HTML', () => {
+  it('markup in message text stays text', () => {
     const tokens = linkify('<b>hi</b> https://example.com');
     expect(tokens[0]).toEqual({ kind: 'text', value: '<b>hi</b> ' });
   });

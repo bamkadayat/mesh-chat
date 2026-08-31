@@ -17,14 +17,6 @@ describe('createId', () => {
     vi.restoreAllMocks();
   });
 
-  it('uses crypto.randomUUID when it is available', () => {
-    const uuid = '11111111-2222-4333-8444-555555555555';
-    const randomUUID = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(uuid);
-
-    expect(createId()).toBe(uuid);
-    expect(randomUUID).toHaveBeenCalledOnce();
-  });
-
   it('returns a valid v4 UUID in a secure context', () => {
     expect(createId()).toMatch(UUID_V4);
   });

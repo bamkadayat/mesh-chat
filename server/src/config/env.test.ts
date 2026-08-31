@@ -16,16 +16,9 @@ describe('readServerConfig', () => {
     });
   });
 
-  it('rejects a port that is not a number', () => {
-    expect(() => readServerConfig({ PORT: 'abc' })).toThrow(/positive integer/);
-  });
-
-  it('rejects a port that is not a whole number', () => {
-    expect(() => readServerConfig({ PORT: '3001.5' })).toThrow(/positive integer/);
-  });
-
-  it('rejects a port of zero or below', () => {
-    expect(() => readServerConfig({ PORT: '0' })).toThrow(/positive integer/);
-    expect(() => readServerConfig({ PORT: '-1' })).toThrow(/positive integer/);
+  it('rejects a port that is not a positive whole number', () => {
+    for (const PORT of ['abc', '3001.5', '0', '-1']) {
+      expect(() => readServerConfig({ PORT })).toThrow(/positive integer/);
+    }
   });
 });

@@ -6,7 +6,7 @@ import {
   serializeTypingEvent,
   type ChatEvent,
 } from './protocol';
-import { MAX_MESSAGE_LENGTH } from '../model/constants';
+import { MAX_DISPLAY_NAME_LENGTH, MAX_MESSAGE_LENGTH } from '../model/constants';
 
 const created: ChatEvent = {
   type: 'message:create',
@@ -47,16 +47,10 @@ function createWith(changes: Record<string, unknown>): string {
 }
 
 describe('serializeChatEvent and parseChatEvent', () => {
-  it('round-trips a create event', () => {
-    expect(parseChatEvent(serializeChatEvent(created))).toEqual(created);
-  });
-
-  it('round-trips an update event', () => {
-    expect(parseChatEvent(serializeChatEvent(updated))).toEqual(updated);
-  });
-
-  it('round-trips a delete event', () => {
-    expect(parseChatEvent(serializeChatEvent(deleted))).toEqual(deleted);
+  it('round-trips every chat event', () => {
+    for (const event of [created, updated, deleted]) {
+      expect(parseChatEvent(serializeChatEvent(event))).toEqual(event);
+    }
   });
 });
 
@@ -109,22 +103,19 @@ describe('parseChatEvent rejects bad input', () => {
     expect(parseChatEvent(createWith({ messageId: null }))).toBeNull();
   });
 
-  it('rejects empty text on create', () => {
+  it('rejects empty text on create and on update', () => {
     expect(parseChatEvent(createWith({ text: '' }))).toBeNull();
     expect(parseChatEvent(createWith({ text: '   ' }))).toBeNull();
-  });
 
-  it('rejects empty text on update', () => {
     const payload = { ...updated.payload, text: '   ' };
     expect(parseChatEvent(JSON.stringify({ type: 'message:update', payload }))).toBeNull();
   });
 
-  it('rejects oversized text on create', () => {
-    expect(parseChatEvent(createWith({ text: 'x'.repeat(MAX_MESSAGE_LENGTH + 1) }))).toBeNull();
-  });
+  it('rejects oversized text on create and on update', () => {
+    const tooLong = 'x'.repeat(MAX_MESSAGE_LENGTH + 1);
+    expect(parseChatEvent(createWith({ text: tooLong }))).toBeNull();
 
-  it('rejects oversized text on update', () => {
-    const payload = { ...updated.payload, text: 'x'.repeat(MAX_MESSAGE_LENGTH + 1) };
+    const payload = { ...updated.payload, text: tooLong };
     expect(parseChatEvent(JSON.stringify({ type: 'message:update', payload }))).toBeNull();
   });
 
@@ -139,7 +130,8 @@ describe('parseChatEvent rejects bad input', () => {
   });
 
   it('rejects an oversized author name', () => {
-    expect(parseChatEvent(createWith({ authorName: 'n'.repeat(33) }))).toBeNull();
+    const tooLong = 'n'.repeat(MAX_DISPLAY_NAME_LENGTH + 1);
+    expect(parseChatEvent(createWith({ authorName: tooLong }))).toBeNull();
   });
 });
 
