@@ -32,7 +32,7 @@ export type ChatSession = {
   status: SessionStatus;
   errorReason: SessionErrorReason | null;
   participants: Participant[];
-  /** Present through signaling, but their DataChannel is not open yet. */
+  /** Present through signaling, with a DataChannel still on its way. */
   connectingIds: string[];
   /** Other participants currently typing, by display name. */
   typingNames: string[];
@@ -437,7 +437,8 @@ export function useChatSession(signalingUrl: string): ChatSession {
         .map((participant) => participant.participantId)
         .filter(
           (participantId) =>
-            participantId !== localParticipantId && channelStates[participantId] !== 'open',
+            participantId !== localParticipantId &&
+            isAwaitingChannel(channelStates[participantId]),
         ),
     [participants, localParticipantId, channelStates],
   );
@@ -472,6 +473,14 @@ function toSessionStatus(state: ConnectionState): SessionStatus {
     case 'failed':
       return 'error';
   }
+}
+
+/**
+ * A failed channel is not a slow one. The composer already says to rejoin, so
+ * the presence list must not keep promising that this peer is on its way.
+ */
+function isAwaitingChannel(state: ChannelState | undefined): boolean {
+  return state === undefined || state === 'connecting';
 }
 
 /** Being in the room is not the same as being able to reach everyone in it. */

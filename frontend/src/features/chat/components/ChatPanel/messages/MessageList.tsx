@@ -9,6 +9,8 @@ const NEAR_BOTTOM_PX = 48;
 
 type MessageListProps = {
   timeline: TimelineItem[];
+  /** False while the participants tab shows, when this list has no layout. */
+  isVisible: boolean;
   localParticipantId: string;
   onEdit: (messageId: string, text: string) => boolean;
   onDelete: (messageId: string) => boolean;
@@ -16,6 +18,7 @@ type MessageListProps = {
 
 export function MessageList({
   timeline,
+  isVisible,
   localParticipantId,
   onEdit,
   onDelete,
@@ -24,14 +27,17 @@ export function MessageList({
   const follow = useRef(true);
   const lastTop = useRef(0);
 
-  /** Pin before paint, so arriving messages never show a half-scrolled frame. */
+  /**
+   * Pin before paint, so arriving messages never show a half-scrolled frame. A
+   * hidden list has no height to pin to, so this runs again when it comes back.
+   */
   useLayoutEffect(() => {
     const region = scrollRef.current;
-    if (region !== null && follow.current) {
+    if (region !== null && isVisible && follow.current) {
       region.scrollTop = region.scrollHeight;
       lastTop.current = region.scrollTop;
     }
-  }, [timeline]);
+  }, [timeline, isVisible]);
 
   /**
    * Treat only upward scrolling as the reader choosing history.

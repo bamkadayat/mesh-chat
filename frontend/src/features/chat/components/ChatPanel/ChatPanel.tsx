@@ -67,8 +67,8 @@ export function ChatPanel({
   );
 
   /**
-   * Messages that arrived while the participant list was open. Deleted messages
-   * stay in the timeline as tombstones, so this count never runs backwards.
+   * Count messages received while the participants tab is open.
+   * Deleted messages still count because they stay as tombstones.
    */
   const unread = tabs.tab === 'chat' ? 0 : messageCount - seenCount;
 
@@ -132,6 +132,7 @@ export function ChatPanel({
         >
           <MessageList
             timeline={timeline}
+            isVisible={tabs.tab === 'chat'}
             localParticipantId={localParticipantId}
             onEdit={onEdit}
             onDelete={onDelete}
