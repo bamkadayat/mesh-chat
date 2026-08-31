@@ -96,8 +96,28 @@ export function ChatPanel({
         <ChatTabs tabs={tabs} participantCount={participants.length} unread={unread} />
 
         {status === 'reconnecting' && (
-          <p className={`${styles.status} ${styles.statusError}`} aria-hidden="true">
-            Reconnecting to the chat server…
+          <p className={styles.banner} aria-hidden="true">
+            <svg className={styles.spinner} viewBox="0 0 16 16">
+              <circle
+                className={styles.spinnerTrack}
+                cx="8"
+                cy="8"
+                r="7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+              <circle
+                className={styles.spinnerArc}
+                cx="8"
+                cy="8"
+                r="7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+            </svg>
+            Reconnecting to the chat server
           </p>
         )}
 

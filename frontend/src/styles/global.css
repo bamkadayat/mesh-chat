@@ -9,6 +9,9 @@
   --color-track: #ebebeb;
   --color-input: #f0f2f5;
   --color-danger: #b3261e;
+  --color-warning: #7b5800;
+  --color-warning-surface: #fef7e0;
+  --color-warning-border: #f0dfa8;
   --color-bubble-peer: #f1f3f4;
   /* White at reduced strength, for text sitting on the accent colour. */
   --color-on-accent-soft: rgb(255 255 255 / 75%);
